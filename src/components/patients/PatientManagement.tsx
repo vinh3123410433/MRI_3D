@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 
 interface Patient {
   id: string;
@@ -8,54 +8,63 @@ interface Patient {
   nextAppointment: string;
   birthDate: string;
   gender: string;
-  imageUrl?: string;
+  //   imageUrl?: string;
+  medical_history: string;
 }
 
 const samplePatients: Patient[] = [
   {
-    id: '1',
-    name: 'Nguyễn Văn An',
-    phone: '0123-456-789',
-    condition: 'Đau đầu',
-    nextAppointment: '25/04/2024',
-    birthDate: '15/04/1975',
-    gender: 'Nam',
-    imageUrl: '/images/sample-mri.png'
+    id: "1",
+    name: "Nguyễn Văn An",
+    phone: "0123-456-789",
+    condition: "Đau đầu",
+    nextAppointment: "25/04/2024",
+    birthDate: "15/04/1975",
+    gender: "Nam",
+    medical_history: "Tiền sử bệnh: Không có",
   },
   {
-    id: '2',
-    name: 'Trần Thị Bình',
-    phone: '0987-654-321',
-    condition: 'Bác sĩ',
-    nextAppointment: '30/04/2024',
-    birthDate: '20/05/1980',
-    gender: 'Nữ'
+    id: "2",
+    name: "Trần Thị Bình",
+    phone: "0987-654-321",
+    condition: "Bác sĩ",
+    nextAppointment: "30/04/2024",
+    birthDate: "20/05/1980",
+    gender: "Nữ",
+    medical_history: "Tiền sử bệnh: Không có",
   },
   {
-    id: '3',
-    name: 'Lê Văn Cương',
-    phone: '0321-567-880',
-    condition: 'Chóng mặt',
-    nextAppointment: '02/05/2024',
-    birthDate: '10/08/1965',
-    gender: 'Nam'
-  }
+    id: "3",
+    name: "Lê Văn Cương",
+    phone: "0321-567-880",
+    condition: "Chóng mặt",
+    nextAppointment: "02/05/2024",
+    birthDate: "10/08/1965",
+    gender: "Nam",
+    medical_history: "Tiền sử bệnh: Không có",
+  },
 ];
 
 const PatientManagement: React.FC = () => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(samplePatients[0]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [patients, setPatients] = useState<Patient[]>(samplePatients);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(
+    patients[0]
+  );
 
-  const filteredPatients = samplePatients.filter(patient =>
-    patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    patient.phone.includes(searchQuery)
+  const filteredPatients = patients.filter(
+    (patient) =>
+      patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      patient.phone.includes(searchQuery)
   );
 
   return (
     <div className="min-h-screen bg-gray-100 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Quản lý bệnh nhân</h1>
-        
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">
+          Quản lý bệnh nhân
+        </h1>
+
         {/* Search bar */}
         <div className="mb-6">
           <input
@@ -80,11 +89,11 @@ const PatientManagement: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredPatients.map(patient => (
+                {filteredPatients.map((patient) => (
                   <tr
                     key={patient.id}
                     className={`border-b cursor-pointer hover:bg-gray-50 ${
-                      selectedPatient?.id === patient.id ? 'bg-blue-50' : ''
+                      selectedPatient?.id === patient.id ? "bg-blue-50" : ""
                     }`}
                     onClick={() => setSelectedPatient(patient)}
                   >
@@ -102,7 +111,7 @@ const PatientManagement: React.FC = () => {
           <div className="w-1/3 bg-white rounded-lg shadow-lg p-6">
             {selectedPatient ? (
               <div>
-                {selectedPatient.imageUrl && (
+                {/* {selectedPatient.imageUrl && (
                   <div className="mb-6">
                     <img
                       src={selectedPatient.imageUrl}
@@ -110,41 +119,53 @@ const PatientManagement: React.FC = () => {
                       className="w-full rounded-lg"
                     />
                   </div>
-                )}
+                )} */}
 
-                <h2 className="text-xl font-semibold mb-4">Thông tin chi tiết</h2>
-                
+                <h2 className="text-xl font-semibold mb-4">
+                  Thông tin chi tiết
+                </h2>
+
                 <div className="space-y-4">
                   <div>
                     <label className="font-medium text-gray-700">Họ tên:</label>
                     <p>{selectedPatient.name}</p>
                   </div>
-                  
+
                   <div>
-                    <label className="font-medium text-gray-700">Ngày sinh:</label>
+                    <label className="font-medium text-gray-700">
+                      Ngày sinh:
+                    </label>
                     <p>{selectedPatient.birthDate}</p>
                   </div>
-                  
+
                   <div>
-                    <label className="font-medium text-gray-700">Giới tính:</label>
+                    <label className="font-medium text-gray-700">
+                      Giới tính:
+                    </label>
                     <p>{selectedPatient.gender}</p>
                   </div>
-                  
+
                   <div>
-                    <label className="font-medium text-gray-700">Tình trạng:</label>
+                    <label className="font-medium text-gray-700">
+                      Tình trạng:
+                    </label>
                     <p>{selectedPatient.condition}</p>
                   </div>
 
                   <button
                     className="mt-4 w-full bg-primary text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                    onClick={() => {/* TODO: Implement view history */}}
+                    onClick={() => {
+                      /* TODO: Implement view history */
+                    }}
                   >
                     Xem lịch sử khám bệnh
                   </button>
                 </div>
               </div>
             ) : (
-              <p className="text-gray-500 text-center">Chọn một bệnh nhân để xem chi tiết</p>
+              <p className="text-gray-500 text-center">
+                Chọn một bệnh nhân để xem chi tiết
+              </p>
             )}
           </div>
         </div>
