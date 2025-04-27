@@ -3,16 +3,16 @@ import * as THREE from 'three';
 import { VolumeRenderShader1 } from 'three/examples/jsm/shaders/VolumeShader.js';
 
 // Định nghĩa kiểu cho dữ liệu volume
-interface VolumeData {
+interface Volume {
   xLength: number;
   yLength: number;
   zLength: number;
-  data: Float32Array;
+  data: Float32Array | undefined;
 }
 
 // Định nghĩa kiểu cho props của component
 interface VolumeMeshProps {
-  volume: VolumeData | null;
+  volume: Volume;
 }
 
 // Định nghĩa kiểu cho cmtextures
@@ -22,7 +22,7 @@ interface ColormapTextures {
 }
 
 const VolumeMesh: React.FC<VolumeMeshProps> = ({ volume }) => {
-  if (!volume) return null;
+  if (!volume.data) return null;
 
   // Tải texture bảng màu
   const cmtextures: ColormapTextures = useMemo(() => {

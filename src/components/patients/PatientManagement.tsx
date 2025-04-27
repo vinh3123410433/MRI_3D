@@ -47,7 +47,7 @@ const samplePatients: Patient[] = [
 
 const PatientManagement: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [patients, setPatients] = useState<Patient[]>(samplePatients);
+  const [patients, _setPatients] = useState<Patient[]>(samplePatients);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(
     patients[0]
   );

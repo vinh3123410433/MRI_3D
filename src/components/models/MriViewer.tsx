@@ -115,9 +115,12 @@ const Mri3dView: React.FC<{
         orthographic
         camera={{
           position: [0, 0, 500],
+          left: (-h * aspect) / 2,
+          right: (h * aspect) / 2,
+          top: h / 2,
+          bottom: -h / 2,
           near: 1,
-          far: 1000,
-          args: [(-h * aspect) / 2, (h * aspect) / 2, h / 2, -h / 2, 1, 1000],
+          far: 1000
         }}
       >
         <ambientLight intensity={0.5} />
@@ -146,15 +149,6 @@ const MriViewer: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"3d" | "slices">("slices");
-  // Thêm state cho các file mẫu
-  const [sampleFiles, setSampleFiles] = useState<
-    { name: string; url: string }[]
-  >([
-    { name: "Brain MRI Sample", url: "/samples/brain_sample.nii.gz" },
-    { name: "Chest MRI Sample", url: "/samples/chest_sample.nii.gz" },
-    { name: "Knee MRI Sample", url: "/samples/knee_sample.nii.gz" },
-  ]);
-  const [showSampleDropdown, setShowSampleDropdown] = useState(false);
 
   const handleFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
@@ -187,31 +181,6 @@ const MriViewer: React.FC = () => {
     };
 
     reader.readAsArrayBuffer(file);
-  };
-
-  // Hàm mới để xử lý file từ server
-  const loadSampleFile = async (url: string) => {
-    setIsLoading(true);
-    setError(null);
-    setShowSampleDropdown(false);
-
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-
-      const buffer = await response.arrayBuffer();
-      processNiftiBuffer(buffer);
-    } catch (error) {
-      console.error("Error loading sample file:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Có lỗi xảy ra khi tải file mẫu từ server"
-      );
-      setIsLoading(false);
-    }
   };
 
   // Tách riêng hàm xử lý buffer để tái sử dụng
