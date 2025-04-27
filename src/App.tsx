@@ -1,7 +1,10 @@
 import React, { useState } from "react";
+import FeatureCards from "./components/FeatureCards";
+import Hero from "./components/Hero";
 import Navbar from "./components/Navbar";
 import AuthView from "./components/auth/AuthView";
 import MriViewer from "./components/models/MriViewer";
+import PatientManagement from "./components/patients/PatientManagement";
 
 const App: React.FC = () => {
   const [showAuth, setShowAuth] = useState(false);
@@ -28,7 +31,7 @@ const App: React.FC = () => {
         onNavigate={handleNavigation}
         currentView={currentView}
       />
-      {/* {currentView === 'home' ? (
+      {currentView === 'home' ? (
         <>
           <Hero />
           <FeatureCards />
@@ -36,8 +39,8 @@ const App: React.FC = () => {
       ) : currentView === 'patients' ? (
         <PatientManagement />
       ) : (
-    )} */}
       <MriViewer />
+    )}
       <AuthView isOpen={showAuth} onClose={handleCloseAuth} />
     </div>
   );

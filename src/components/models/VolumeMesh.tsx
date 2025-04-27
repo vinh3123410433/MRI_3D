@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { VolumeRenderShader1 } from 'three/examples/jsm/shaders/VolumeShader.js';
 
 // Định nghĩa kiểu cho dữ liệu volume
-interface VolumeData {
+export interface VolumeData {
   xLength: number;
   yLength: number;
   zLength: number;
