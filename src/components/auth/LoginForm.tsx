@@ -1,15 +1,30 @@
 import React, { useState } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 
 const LoginForm: React.FC = () => {
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement login logic
-    console.log('Login data:', formData);
+    setError('');
+    setIsLoading(true);
+
+    try {
+      const success = await login(formData.email, formData.password);
+      if (!success) {
+        setError('Email hoặc mật khẩu không đúng');
+      }
+    } catch (err) {
+      setError('Đã xảy ra lỗi khi đăng nhập');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -27,6 +42,11 @@ const LoginForm: React.FC = () => {
             Đăng nhập
           </h2>
         </div>
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
+            {error}
+          </div>
+        )}
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
@@ -42,6 +62,7 @@ const LoginForm: React.FC = () => {
                 placeholder="Nhập địa chỉ email"
                 value={formData.email}
                 onChange={handleChange}
+                disabled={isLoading}
               />
             </div>
             <div>
@@ -57,6 +78,7 @@ const LoginForm: React.FC = () => {
                 placeholder="Nhập mật khẩu"
                 value={formData.password}
                 onChange={handleChange}
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -64,9 +86,10 @@ const LoginForm: React.FC = () => {
           <div>
             <button
               type="submit"
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-medium text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors duration-200"
+              disabled={isLoading}
+              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-medium text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Đăng nhập
+              {isLoading ? 'Đang đăng nhập...' : 'Đăng nhập'}
             </button>
           </div>
         </form>

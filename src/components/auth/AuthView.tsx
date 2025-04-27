@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import LoginForm from './LoginForm';
 import RegisterForm from './RegisterForm';
 
@@ -9,6 +10,14 @@ interface AuthViewProps {
 
 const AuthView: React.FC<AuthViewProps> = ({ isOpen, onClose }) => {
   const [isLogin, setIsLogin] = useState(true);
+  const { isAuthenticated } = useAuth();
+
+  // Close modal when authentication is successful
+  useEffect(() => {
+    if (isAuthenticated) {
+      onClose();
+    }
+  }, [isAuthenticated, onClose]);
 
   if (!isOpen) return null;
 
