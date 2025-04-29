@@ -1,19 +1,20 @@
+import { OrbitControls } from "@react-three/drei";
+import { Canvas } from "@react-three/fiber";
 import * as NiftiReader from "nifti-reader-js";
 import React, { useEffect, useRef, useState } from "react";
-<<<<<<< HEAD
 import VolumeMesh from "./VolumeMesh";
 import mriService from "../../services/MriService";
-=======
-import Mri3dView from "./Mri3dView";
-import { SliceView } from "./SliceView";
->>>>>>> e5e2cb798a7ca9beb3b84d64356711de7b8e9e22
 
 interface MriData {
   data: Float32Array;
   dimensions: [number, number, number];
+  slices: {
+    x: number;
+    y: number;
+    z: number;
+  };
 }
 
-<<<<<<< HEAD
 // Function to show a save dialog
 interface PatientOption {
   id: string;
@@ -238,10 +239,6 @@ const Mri3dView: React.FC<{
       >
         <ambientLight intensity={0.5} />
         <OrbitControls />
-        {/* <mesh>
-          <boxGeometry args={[10, 10, 10]} />
-        </mesh> */}
-
         <VolumeMesh
           volume={{
             xLength: dimensions?.[0] || 0,
@@ -297,11 +294,6 @@ const MriViewer: React.FC = () => {
 
     reader.readAsArrayBuffer(file);
   };
-=======
-function useMriLoader({ url, file }: { url?: string; file?: File }): [MriData| undefined, Error | undefined] {
-  const [mriData, setMriData] = useState<MriData>();
-	const [err, setErr] = useState()
->>>>>>> e5e2cb798a7ca9beb3b84d64356711de7b8e9e22
 
   // Tách riêng hàm xử lý buffer để tái sử dụng
   const processNiftiBuffer = (buffer: ArrayBuffer) => {
@@ -368,56 +360,40 @@ function useMriLoader({ url, file }: { url?: string; file?: File }): [MriData| u
       setMriData({
         data: data,
         dimensions,
+        slices: {
+          x: middleX,
+          y: middleY,
+          z: middleZ,
+        },
       });
+      setIsLoading(false);
     } catch (error) {
       console.error("Error processing NIFTI buffer:", error);
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Có lỗi xảy ra khi xử lý dữ liệu NIFTI"
+      );
+      setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (url && file) {
-      throw new Error("url or file not both");
-    }
+  const handleSliceChange = (orientation: "x" | "y" | "z", value: number) => {
+    if (!mriData) return;
 
-    if (url) {
-      fetch(url)
-        .then((e) => e.arrayBuffer())
-        .then(processNiftiBuffer);
-    } else if (file) {
-      const reader = new FileReader();
-
-      reader.onload = async (e) => {
-        try {
-          const buffer = e.target?.result as ArrayBuffer;
-          processNiftiBuffer(buffer);
-        } catch (error) {
-          console.error("Error processing MRI file:", error);
-        }
-      };
-
-      reader.onerror = (err) => {
-        console.error(err);
-      };
-
-      reader.readAsArrayBuffer(file);
-    }
-  }, [url, file]);
-
-  return [mriData, err];
-}
-
-
-const MriViewer: React.FC = () => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-	const [file, setFile] = useState<File>()
-  const [mriData, error] = useMriLoader({file})
-  const [viewMode, setViewMode] = useState<"3d" | "slices">("3d");
+    setMriData({
+      ...mriData,
+      slices: {
+        ...mriData.slices,
+        [orientation]: value,
+      },
+    });
+  };
 
   const toggleViewMode = () => {
     setViewMode(viewMode === "3d" ? "slices" : "3d");
   };
 
-<<<<<<< HEAD
   const handleSaveToPatient = () => {
     if (!mriData) {
       setError("Không có dữ liệu MRI để lưu");
@@ -451,12 +427,6 @@ const MriViewer: React.FC = () => {
       setError("Không thể lưu dữ liệu MRI. Vui lòng thử lại.");
     }
   };
-=======
-
-	const handleFileUpload = () => {
-		setFile(fileInputRef.current?.files?.[0] || undefined)
-	}
->>>>>>> e5e2cb798a7ca9beb3b84d64356711de7b8e9e22
 
   return (
     <div className="w-full h-screen flex flex-col">
@@ -475,6 +445,28 @@ const MriViewer: React.FC = () => {
                 file:bg-primary file:text-white
                 hover:file:bg-blue-700"
             />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label
+              htmlFor="threshold"
+              className="text-sm font-medium text-gray-700"
+            >
+              Ngưỡng:
+            </label>
+            <input
+              type="range"
+              id="threshold"
+              min="0"
+              max="1"
+              step="0.01"
+              value={threshold}
+              onChange={(e) => setThreshold(parseFloat(e.target.value))}
+              className="w-32"
+            />
+            <span className="text-sm text-gray-600">
+              {threshold.toFixed(2)}
+            </span>
           </div>
         </div>
 
@@ -535,11 +527,6 @@ const MriViewer: React.FC = () => {
             )}
           </button>
         </div>
-<<<<<<< HEAD
-=======
-
-        {error && <div className="mt-2 text-red-600 text-sm">Lỗi: {String(error)}</div>}
->>>>>>> e5e2cb798a7ca9beb3b84d64356711de7b8e9e22
       </div>
 
       {(error || successMessage) && (
@@ -549,17 +536,98 @@ const MriViewer: React.FC = () => {
       )}
 
       <div className="flex-1 bg-gray-100 p-4 overflow-auto">
-        {mriData ? (
+        {isLoading ? (
+          <div className="w-full h-full flex items-center justify-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
+          </div>
+        ) : mriData ? (
           viewMode === "3d" ? (
             <Mri3dView
               data={mriData.data}
               dimensions={mriData.dimensions}
-            ></Mri3dView>
+            />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
-							<SliceView data={mriData.data} dimensions={mriData.dimensions} sliceOrientation="x"/>
-							<SliceView data={mriData.data} dimensions={mriData.dimensions} sliceOrientation="y"/>
-							<SliceView data={mriData.data} dimensions={mriData.dimensions} sliceOrientation="z"/>
+              {/* X-axis slice (YZ plane) */}
+              <div className="flex flex-col bg-white rounded-lg shadow p-4">
+                <SliceView
+                  data={mriData.data}
+                  dimensions={mriData.dimensions}
+                  sliceIndex={mriData.slices.x}
+                  sliceOrientation="x"
+                  threshold={threshold}
+                />
+                <div className="mt-4 flex items-center">
+                  <span className="text-sm text-gray-600 mr-2">Slice:</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max={mriData.dimensions[0] - 1}
+                    value={mriData.slices.x}
+                    onChange={(e) =>
+                      handleSliceChange("x", parseInt(e.target.value))
+                    }
+                    className="w-full"
+                  />
+                  <span className="ml-2 text-sm text-gray-600">
+                    {mriData.slices.x + 1}/{mriData.dimensions[0]}
+                  </span>
+                </div>
+              </div>
+
+              {/* Y-axis slice (XZ plane) */}
+              <div className="flex flex-col bg-white rounded-lg shadow p-4">
+                <SliceView
+                  data={mriData.data}
+                  dimensions={mriData.dimensions}
+                  sliceIndex={mriData.slices.y}
+                  sliceOrientation="y"
+                  threshold={threshold}
+                />
+                <div className="mt-4 flex items-center">
+                  <span className="text-sm text-gray-600 mr-2">Slice:</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max={mriData.dimensions[1] - 1}
+                    value={mriData.slices.y}
+                    onChange={(e) =>
+                      handleSliceChange("y", parseInt(e.target.value))
+                    }
+                    className="w-full"
+                  />
+                  <span className="ml-2 text-sm text-gray-600">
+                    {mriData.slices.y + 1}/{mriData.dimensions[1]}
+                  </span>
+                </div>
+              </div>
+
+              {/* Z-axis slice (XY plane) */}
+              <div className="flex flex-col bg-white rounded-lg shadow p-4">
+                <SliceView
+                  data={mriData.data}
+                  dimensions={mriData.dimensions}
+                  sliceIndex={mriData.slices.z}
+                  sliceOrientation="z"
+                  threshold={threshold}
+                />
+                <div className="mt-4 flex items-center">
+                  <span className="text-sm text-gray-600 mr-2">Slice:</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max={mriData.dimensions[2] - 1}
+                    value={mriData.slices.z}
+                    onChange={(e) =>
+                      handleSliceChange("z", parseInt(e.target.value))
+                    }
+                    className="w-full"
+                  />
+                  <span className="ml-2 text-sm text-gray-600">
+                    {mriData.slices.z + 1}/{mriData.dimensions[2]}
+                  </span>
+                </div>
+              </div>
             </div>
           )
         ) : (

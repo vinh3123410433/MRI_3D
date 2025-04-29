@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -90,13 +89,24 @@ def add_patient():
     data = request.json
     if not data:
         return jsonify({"error": "No data provided"}), 400
-        
+    
+    # Check for appointment time conflicts
+    appointment_date = data.get('next_appointment', '')
+    if appointment_date:
+        # Check if there's any patient with the exact same appointment time
+        existing_appointment = Patient.query.filter_by(next_appointment=appointment_date).first()
+        if existing_appointment:
+            return jsonify({
+                "error": "Thời gian đã được đặt cho bệnh nhân khác",
+                "message": f"Thời gian {appointment_date} đã được đặt cho bệnh nhân {existing_appointment.full_name}"
+            }), 409  # Conflict status code
+    
     new_patient = Patient(
         full_name=data.get('full_name'),
         dob=data.get('dob'),
         gender=data.get('gender'),
         condition=data.get('condition', ''),
-        next_appointment=data.get('next_appointment', ''),
+        next_appointment=appointment_date,
         history=data.get('history', ''),
         mri_images=data.get('mri_images', '')
     )

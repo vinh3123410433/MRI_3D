@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import listPlugin from '@fullcalendar/list';
 import interactionPlugin from '@fullcalendar/interaction';
-import { EventClickArg, DateClickArg, EventChangeArg } from '@fullcalendar/core';
+import { EventClickArg, EventChangeArg } from '@fullcalendar/core';
 import viLocale from '@fullcalendar/core/locales/vi';
 
 interface Appointment {
@@ -35,6 +35,7 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<'dayGridMonth' | 'timeGridWeek' | 'listWeek'>('dayGridMonth');
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const calendarRef = useRef<FullCalendar>(null);
   
   // Sample appointments data
   const defaultAppointments: Appointment[] = [
@@ -75,6 +76,49 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
   
   const appointments = initialAppointments.length > 0 ? initialAppointments : defaultAppointments;
 
+  // Check if a time slot has a conflict with existing appointments
+  const hasTimeConflict = (startTime: Date, endTime: Date, excludeAppointmentId?: string): boolean => {
+    return appointments.some(appointment => {
+      // Skip checking against the appointment we're currently editing
+      if (excludeAppointmentId && appointment.id === excludeAppointmentId) {
+        return false;
+      }
+      
+      const aptStart = new Date(appointment.start);
+      const aptEnd = appointment.end ? new Date(appointment.end) : new Date(aptStart.getTime() + 45 * 60000); // Default to 45 minutes if no end time
+      
+      // Check for overlap: 
+      // If start time is before existing appointment end AND end time is after existing appointment start
+      return (startTime < aptEnd && endTime > aptStart);
+    });
+  };
+
+  // Create a new appointment with time conflict validation
+  const createAppointment = (patientId: string, patientName: string, startTime: Date): Appointment | null => {
+    const endTime = new Date(startTime.getTime() + 45 * 60000); // Default 45 min appointment
+    
+    if (hasTimeConflict(startTime, endTime)) {
+      alert('Khung giờ này đã có lịch hẹn. Vui lòng chọn thời gian khác.');
+      return null;
+    }
+    
+    // Format hour display with leading zero if needed
+    const hourStr = startTime.getHours().toString().padStart(2, '0');
+    const minuteStr = startTime.getMinutes().toString().padStart(2, '0');
+    
+    return {
+      id: `new-${Date.now()}`, // Generate unique ID
+      title: `${hourStr}:${minuteStr} ${patientName.split(' ').map(n => n[0]).join('.')}`,
+      start: startTime.toISOString(),
+      end: endTime.toISOString(),
+      patient: {
+        id: patientId,
+        name: patientName
+      },
+      backgroundColor: '#4CAF50' // Default color
+    };
+  };
+
   const handleEventClick = (clickInfo: EventClickArg) => {
     const appointment = appointments.find(apt => apt.id === clickInfo.event.id);
     if (appointment && onAppointmentClick) {
@@ -82,7 +126,7 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
     }
   };
 
-  const handleDateClick = (info: DateClickArg) => {
+  const handleDateClick = (info: any) => {
     if (onDateClick) {
       onDateClick(info.date);
     }
@@ -92,30 +136,43 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
     if (onAppointmentChange) {
       const updatedAppointment = appointments.find(apt => apt.id === changeInfo.event.id);
       if (updatedAppointment) {
-        updatedAppointment.start = changeInfo.event.start?.toISOString() || '';
-        updatedAppointment.end = changeInfo.event.end?.toISOString();
-        onAppointmentChange(updatedAppointment);
+        const newStart = changeInfo.event.start || new Date();
+        const newEnd = changeInfo.event.end || new Date(newStart.getTime() + 45 * 60000);
+        
+        // Check for conflicts when moving an appointment
+        if (!hasTimeConflict(newStart, newEnd, updatedAppointment.id)) {
+          updatedAppointment.start = newStart.toISOString();
+          updatedAppointment.end = newEnd.toISOString();
+          onAppointmentChange(updatedAppointment);
+        } else {
+          alert('Không thể di chuyển lịch hẹn do trùng với lịch hẹn khác.');
+          // Revert the change
+          changeInfo.revert();
+        }
       }
     }
   };
 
   const handleToday = () => {
     setCurrentDate(new Date());
+    if (calendarRef.current) {
+      calendarRef.current.getApi().today();
+    }
   };
 
   const handlePrev = () => {
-    const calendarApi = document.querySelector('.fc')['_calendar'];
-    if (calendarApi) {
-      calendarApi.prev();
-      setCurrentDate(calendarApi.getDate());
+    if (calendarRef.current) {
+      const api = calendarRef.current.getApi();
+      api.prev();
+      setCurrentDate(api.getDate());
     }
   };
 
   const handleNext = () => {
-    const calendarApi = document.querySelector('.fc')['_calendar'];
-    if (calendarApi) {
-      calendarApi.next();
-      setCurrentDate(calendarApi.getDate());
+    if (calendarRef.current) {
+      const api = calendarRef.current.getApi();
+      api.next();
+      setCurrentDate(api.getDate());
     }
   };
 
@@ -180,6 +237,7 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
 
       <div className="calendar-container">
         <FullCalendar
+          ref={calendarRef}
           plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
           initialView={viewMode}
           headerToolbar={false}
