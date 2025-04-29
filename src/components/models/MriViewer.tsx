@@ -3,6 +3,7 @@ import { Canvas } from "@react-three/fiber";
 import * as NiftiReader from "nifti-reader-js";
 import React, { useEffect, useRef, useState } from "react";
 import VolumeMesh from "./VolumeMesh";
+import mriService from "../../services/MriService";
 
 interface MriData {
   data: Float32Array;
@@ -13,6 +14,119 @@ interface MriData {
     z: number;
   };
 }
+
+// Function to show a save dialog
+interface PatientOption {
+  id: string;
+  name: string;
+}
+
+interface SaveDialogProps {
+  onSave: (patientId: string, name: string) => void;
+  onCancel: () => void;
+}
+
+const SaveDialog: React.FC<SaveDialogProps> = ({ onSave, onCancel }) => {
+  const [patientId, setPatientId] = useState('');
+  const [scanName, setScanName] = useState('');
+  const [patientOptions, setPatientOptions] = useState<PatientOption[]>([]);
+  
+  // Fetch patient options on mount
+  useEffect(() => {
+    // In a real app, you would fetch this from your backend or state management
+    // For now, we'll use some static data from localStorage
+    try {
+      const patientsData = localStorage.getItem('patients');
+      if (patientsData) {
+        const patients = JSON.parse(patientsData);
+        setPatientOptions(patients.map((p: any) => ({ id: p.id, name: p.name })));
+      } else {
+        // Use demo patients if no saved patients
+        setPatientOptions([
+          { id: '1', name: 'Nguyễn Văn An' },
+          { id: '2', name: 'Trần Thị Bình' },
+          { id: '3', name: 'Lê Văn Cương' }
+        ]);
+      }
+    } catch (error) {
+      console.error('Failed to load patients:', error);
+      // Fallback to demo patients
+      setPatientOptions([
+        { id: '1', name: 'Nguyễn Văn An' },
+        { id: '2', name: 'Trần Thị Bình' },
+        { id: '3', name: 'Lê Văn Cương' }
+      ]);
+    }
+  }, []);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (patientId && scanName) {
+      onSave(patientId, scanName);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+        <h2 className="text-xl font-semibold mb-4">Lưu MRI vào hồ sơ bệnh nhân</h2>
+        
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label htmlFor="patientId" className="block text-sm font-medium text-gray-700 mb-1">
+              Chọn bệnh nhân
+            </label>
+            <select
+              id="patientId"
+              value={patientId}
+              onChange={(e) => setPatientId(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            >
+              <option value="">-- Chọn bệnh nhân --</option>
+              {patientOptions.map(patient => (
+                <option key={patient.id} value={patient.id}>
+                  {patient.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          <div className="mb-6">
+            <label htmlFor="scanName" className="block text-sm font-medium text-gray-700 mb-1">
+              Tên chụp MRI
+            </label>
+            <input
+              id="scanName"
+              type="text"
+              value={scanName}
+              onChange={(e) => setScanName(e.target.value)}
+              placeholder="VD: MRI não 29/04/2025"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+          
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
+            >
+              Hủy bỏ
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              Lưu lại
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
 
 // Component to display a 2D slice of the MRI data
 const SliceView: React.FC<{
@@ -149,6 +263,8 @@ const MriViewer: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"3d" | "slices">("slices");
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const handleFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
@@ -282,6 +398,40 @@ const MriViewer: React.FC = () => {
     setViewMode(viewMode === "3d" ? "slices" : "3d");
   };
 
+  const handleSaveToPatient = () => {
+    if (!mriData) {
+      setError("Không có dữ liệu MRI để lưu");
+      return;
+    }
+    
+    setShowSaveDialog(true);
+  };
+
+  const handleSaveConfirm = (patientId: string, name: string) => {
+    if (!mriData) return;
+    
+    try {
+      mriService.saveMriForPatient(
+        patientId,
+        name,
+        mriData.data,
+        mriData.dimensions,
+        mriData.slices
+      );
+      
+      setShowSaveDialog(false);
+      setSuccessMessage(`Đã lưu MRI "${name}" cho bệnh nhân thành công!`);
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => {
+        setSuccessMessage(null);
+      }, 5000);
+    } catch (error) {
+      console.error("Error saving MRI data:", error);
+      setError("Không thể lưu dữ liệu MRI. Vui lòng thử lại.");
+    }
+  };
+
   return (
     <div className="w-full h-screen flex flex-col">
       <div className="flex justify-between p-4 bg-white shadow-md">
@@ -324,7 +474,19 @@ const MriViewer: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center">
+        <div className="flex items-center gap-2">
+          {mriData && (
+            <button
+              onClick={handleSaveToPatient}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z" />
+              </svg>
+              Lưu vào hồ sơ bệnh nhân
+            </button>
+          )}
+          
           <button
             onClick={toggleViewMode}
             className="px-4 py-2 bg-primary text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
@@ -369,9 +531,13 @@ const MriViewer: React.FC = () => {
             )}
           </button>
         </div>
-
-        {error && <div className="mt-2 text-red-600 text-sm">Lỗi: {error}</div>}
       </div>
+
+      {(error || successMessage) && (
+        <div className={`p-3 ${error ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'} rounded-md mx-4 mt-2`}>
+          {error || successMessage}
+        </div>
+      )}
 
       <div className="flex-1 bg-gray-100 p-4 overflow-auto">
         {isLoading ? (
@@ -476,6 +642,13 @@ const MriViewer: React.FC = () => {
           </div>
         )}
       </div>
+
+      {showSaveDialog && (
+        <SaveDialog
+          onSave={handleSaveConfirm}
+          onCancel={() => setShowSaveDialog(false)}
+        />
+      )}
     </div>
   );
 };
