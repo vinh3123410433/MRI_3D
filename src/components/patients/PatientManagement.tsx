@@ -1,19 +1,53 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 
 interface Patient {
   id: string;
-  full_name: string;
+  name: string;
+  phone: string;
   condition: string;
-  next_appointment: string;
-  dob: string;
+  nextAppointment: string;
+  birthDate: string;
   gender: string;
   //   imageUrl?: string;
   medical_history: string;
 }
 
+const samplePatients: Patient[] = [
+  {
+    id: "1",
+    name: "Nguyễn Văn An",
+    phone: "0123-456-789",
+    condition: "Đau đầu",
+    nextAppointment: "25/04/2024",
+    birthDate: "15/04/1975",
+    gender: "Nam",
+    medical_history: "Tiền sử bệnh: Không có",
+  },
+  {
+    id: "2",
+    name: "Trần Thị Bình",
+    phone: "0987-654-321",
+    condition: "Bác sĩ",
+    nextAppointment: "30/04/2024",
+    birthDate: "20/05/1980",
+    gender: "Nữ",
+    medical_history: "Tiền sử bệnh: Không có",
+  },
+  {
+    id: "3",
+    name: "Lê Văn Cương",
+    phone: "0321-567-880",
+    condition: "Chóng mặt",
+    nextAppointment: "02/05/2024",
+    birthDate: "10/08/1965",
+    gender: "Nam",
+    medical_history: "Tiền sử bệnh: Không có",
+  },
+];
+
 const PatientManagement: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [patients, setPatients] = useState<Patient[]>([]);
+  const [patients, setPatients] = useState<Patient[]>(samplePatients);
   const [addShow, setAddShow] = useState<boolean>(!!0);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(
     patients?.[0]
@@ -21,14 +55,9 @@ const PatientManagement: React.FC = () => {
 
   const filteredPatients = patients.filter(
     (patient) =>
-      patient.full_name.toLowerCase().includes(searchQuery.toLowerCase())
+      patient.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  useEffect(() => {
-    fetch("http://127.0.0.1:5000/patients").then(async (resp) => {
-      setPatients(await resp.json());
-    });
-  }, []);
 
   return (
     <div className="min-h-screen bg-gray-100 py-8">
@@ -294,10 +323,10 @@ const PatientManagement: React.FC = () => {
                     }`}
                     onClick={() => setSelectedPatient(patient)}
                   >
-                    <td className="py-3">{patient.full_name}</td>
-                    <td className="py-3">{patient.dob}</td>
+                    <td className="py-3">{patient.name}</td>
+                    <td className="py-3">{patient.phone}</td>
                     <td className="py-3">{patient.condition}</td>
-                    <td className="py-3">{patient.next_appointment}</td>
+                    <td className="py-3">{patient.nextAppointment}</td>
                   </tr>
                 ))}
               </tbody>
@@ -315,14 +344,14 @@ const PatientManagement: React.FC = () => {
                 <div className="space-y-4">
                   <div>
                     <label className="font-medium text-gray-700">Họ tên:</label>
-                    <p>{selectedPatient.full_name}</p>
+                    <p>{selectedPatient.name}</p>
                   </div>
 
                   <div>
                     <label className="font-medium text-gray-700">
                       Ngày sinh:
                     </label>
-                    <p>{selectedPatient.dob}</p>
+                    <p>{selectedPatient.birthDate}</p>
                   </div>
 
                   <div>

@@ -7,12 +7,12 @@ export interface VolumeData {
   xLength: number;
   yLength: number;
   zLength: number;
-  data: Float32Array;
+  data: Float32Array | undefined;
 }
 
 // Định nghĩa kiểu cho props của component
 interface VolumeMeshProps {
-  volume: VolumeData | null;
+  volume: VolumeData;
 }
 
 // Định nghĩa kiểu cho cmtextures
@@ -22,7 +22,7 @@ interface ColormapTextures {
 }
 
 const VolumeMesh: React.FC<VolumeMeshProps> = ({ volume }) => {
-  if (!volume) return null;
+  if (!volume.data) return null;
 
   // Tải texture bảng màu
   const cmtextures: ColormapTextures = useMemo(() => {
