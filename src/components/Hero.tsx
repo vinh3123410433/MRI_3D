@@ -1,6 +1,18 @@
 import React from "react";
 
-const Hero: React.FC = () => {
+interface HeroProps {
+  onLearnMoreClick?: () => void;
+}
+
+const Hero: React.FC<HeroProps> = ({ onLearnMoreClick }) => {
+  const handleLearnMoreClick = (e: React.MouseEvent) => {
+    if (onLearnMoreClick) {
+      e.preventDefault();
+      onLearnMoreClick();
+    }
+    // Nếu không có onLearnMoreClick, hoạt động mặc định sẽ được thực hiện (cuộn đến #features)
+  };
+
   return (
     <div className="relative bg-gradient-to-b from-white to-blue-50">
       <div className="max-w-7xl mx-auto">
@@ -31,6 +43,7 @@ const Hero: React.FC = () => {
                 <div className="rounded-md shadow">
                   <a
                     href="#features"
+                    onClick={handleLearnMoreClick}
                     className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 md:py-4 md:text-lg md:px-10 transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1"
                   >
                     Tìm hiểu thêm

@@ -25,6 +25,7 @@ interface AppointmentCalendarProps {
   onAppointmentClick?: (appointment: Appointment) => void;
   onDateClick?: (date: Date) => void;
   onAppointmentChange?: (appointment: Appointment) => void;
+  onNavigateHome?: () => void; // Thêm prop điều hướng về trang chủ
 }
 
 const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
@@ -32,6 +33,7 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
   onAppointmentClick,
   onDateClick,
   onAppointmentChange,
+  onNavigateHome,
 }) => {
   const [viewMode, setViewMode] = useState<'dayGridMonth' | 'timeGridWeek' | 'listWeek'>('dayGridMonth');
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -93,31 +95,7 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
     });
   };
 
-  // Create a new appointment with time conflict validation
-  const createAppointment = (patientId: string, patientName: string, startTime: Date): Appointment | null => {
-    const endTime = new Date(startTime.getTime() + 45 * 60000); // Default 45 min appointment
-    
-    if (hasTimeConflict(startTime, endTime)) {
-      alert('Khung giờ này đã có lịch hẹn. Vui lòng chọn thời gian khác.');
-      return null;
-    }
-    
-    // Format hour display with leading zero if needed
-    const hourStr = startTime.getHours().toString().padStart(2, '0');
-    const minuteStr = startTime.getMinutes().toString().padStart(2, '0');
-    
-    return {
-      id: `new-${Date.now()}`, // Generate unique ID
-      title: `${hourStr}:${minuteStr} ${patientName.split(' ').map(n => n[0]).join('.')}`,
-      start: startTime.toISOString(),
-      end: endTime.toISOString(),
-      patient: {
-        id: patientId,
-        name: patientName
-      },
-      backgroundColor: '#4CAF50' // Default color
-    };
-  };
+  // Removed unused createAppointment function
 
   const handleEventClick = (clickInfo: EventClickArg) => {
     const appointment = appointments.find(apt => apt.id === clickInfo.event.id);
@@ -176,12 +154,22 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
     }
   };
 
+  // Xử lý khi nhấn nút Trang Chủ
+  const handleHomeClick = () => {
+    if (onNavigateHome) {
+      onNavigateHome();
+    } else {
+      // Fallback nếu không có prop onNavigateHome
+      window.location.href = '/';
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center">
           <button 
-            onClick={() => window.history.back()}
+            onClick={handleHomeClick}
             className="mr-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
           >
             Trang Chủ

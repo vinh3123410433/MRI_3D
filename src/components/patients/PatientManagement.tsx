@@ -60,9 +60,7 @@ const PatientManagement: React.FC = () => {
   );
   const [currentView, setCurrentView] = useState<View>("patients");
 
-  // State for appointment creation
-  const [isAddingAppointment, setIsAddingAppointment] = useState(false);
-  const [appointmentDateTime, setAppointmentDateTime] = useState<Date | null>(null);
+  // Removed unused appointment state variables
   
   const filteredPatients = patients.filter(
     (patient) =>
@@ -70,39 +68,7 @@ const PatientManagement: React.FC = () => {
       patient.phone.includes(searchQuery)
   );
 
-  // Check if a time slot has a conflict with existing patient appointments
-  const hasAppointmentTimeConflict = (dateTimeStr: string): boolean => {
-    const dateTime = new Date(dateTimeStr);
-    const endTime = new Date(dateTime.getTime() + 45 * 60000); // Default 45 min appointment
-    
-    return patients.some(patient => {
-      // Skip if patient doesn't have nextAppointment
-      if (!patient.nextAppointment) return false;
-      
-      // Parse the nextAppointment string to a Date
-      try {
-        // Convert from DD/MM/YYYY to a Date object
-        const appointmentParts = patient.nextAppointment.split('/');
-        if (appointmentParts.length !== 3) return false;
-        
-        const day = parseInt(appointmentParts[0], 10);
-        const month = parseInt(appointmentParts[1], 10) - 1; // JS months are 0-indexed
-        const year = parseInt(appointmentParts[2], 10);
-        
-        // Create date with the time from our dateTime parameter
-        const existingAppointment = new Date(year, month, day);
-        existingAppointment.setHours(dateTime.getHours(), dateTime.getMinutes(), 0, 0);
-        
-        const existingEndTime = new Date(existingAppointment.getTime() + 45 * 60000);
-        
-        // Check for overlap
-        return (dateTime < existingEndTime && endTime > existingAppointment);
-      } catch (error) {
-        console.error("Error parsing appointment date:", error);
-        return false;
-      }
-    });
-  };
+  // Removed unused hasAppointmentTimeConflict function
 
   const handleIntakeFormSubmit = (formData: PatientIntakeData) => {
     // Generate a unique ID for the new patient
@@ -171,6 +137,7 @@ const PatientManagement: React.FC = () => {
             onDateClick={() => {
               // Could implement functionality to create a new appointment on date click
             }}
+            onNavigateHome={() => setCurrentView("patients")}
           />
         );
       case "mri-viewer":
