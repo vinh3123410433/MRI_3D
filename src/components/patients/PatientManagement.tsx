@@ -49,7 +49,7 @@ const samplePatients: Patient[] = [
   },
 ];
 
-type View = "patients" | "intake-form" | "calendar" | "mri-viewer";
+type View = "patients" | "intake-form" | "calendar" | "mri-viewer" | "patient-history";
 
 const PatientManagement: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -157,6 +157,136 @@ const PatientManagement: React.FC = () => {
             </button>
           </div>
         );
+      case "patient-history":
+        return selectedPatient ? (
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-4xl mx-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h1 className="text-2xl font-bold text-blue-600">Lịch sử bệnh: {selectedPatient.name}</h1>
+              <button
+                onClick={() => setCurrentView("patients")}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-gray-800 mb-3">Thông tin cá nhân</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-gray-600">Họ và tên:</p>
+                  <p className="font-medium">{selectedPatient.name}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Ngày sinh:</p>
+                  <p className="font-medium">{selectedPatient.birthDate}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Giới tính:</p>
+                  <p className="font-medium">{selectedPatient.gender}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Số điện thoại:</p>
+                  <p className="font-medium">{selectedPatient.phone}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-gray-800 mb-3">Tiền sử bệnh</h2>
+              <div className="bg-gray-50 p-4 rounded-md">
+                <p>{selectedPatient.medical_history || "Không có tiền sử bệnh"}</p>
+              </div>
+            </div>
+            
+            {/* Sample visit history - in a real app, this would be fetched from a database */}
+            <div>
+              <h2 className="text-xl font-semibold text-gray-800 mb-3">Lịch sử khám bệnh</h2>
+              
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ngày khám
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Chẩn đoán
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Bác sĩ
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ghi chú
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {selectedPatient.id === "1" ? (
+                      <>
+                        <tr>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">15/03/2025</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Đau đầu cấp tính</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">BS. Trần Văn B</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">Đau nửa đầu bên phải. Đã kê thuốc giảm đau.</td>
+                        </tr>
+                        <tr>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">25/02/2025</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Chóng mặt</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">BS. Nguyễn Thị A</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">Chóng mặt khi thay đổi tư thế. Đề nghị kiểm tra huyết áp định kỳ.</td>
+                        </tr>
+                      </>
+                    ) : selectedPatient.id === "2" ? (
+                      <tr>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">10/01/2025</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Kiểm tra sức khỏe định kỳ</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">BS. Phạm Văn C</td>
+                        <td className="px-6 py-4 text-sm text-gray-900">Tình trạng sức khỏe bình thường.</td>
+                      </tr>
+                    ) : selectedPatient.id === "3" ? (
+                      <>
+                        <tr>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">05/04/2025</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Chóng mặt</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">BS. Lê Thị D</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">Mất thăng bằng, buồn nôn. Đề nghị chụp MRI não để kiểm tra.</td>
+                        </tr>
+                      </>
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">
+                          Không có lịch sử khám bệnh
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <div className="flex justify-center mt-8">
+              <button
+                onClick={() => setCurrentView("patients")}
+                className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Quay lại
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="p-4 text-center">
+            <p className="text-red-500">Lỗi: Không có bệnh nhân nào được chọn.</p>
+            <button 
+              onClick={() => setCurrentView("patients")}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md"
+            >
+              Quay lại
+            </button>
+          </div>
+        );
       case "patients":
       default:
         return (
@@ -200,7 +330,7 @@ const PatientManagement: React.FC = () => {
 
             {addShow && (
               <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                <div className="relative max-w-2xl w-full bg-white rounded-xl shadow-lg">
+                <div className="relative max-w-xl w-full bg-white rounded-xl shadow-lg"> {/* Đã giảm kích thước từ max-w-2xl xuống max-w-xl */}
                   <button className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 transition-colors duration-200" onClick={() => setAddShow(false)}>
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -217,15 +347,15 @@ const PatientManagement: React.FC = () => {
                       />
                     </svg>
                   </button>
-                  <div className="p-8">
+                  <div className="p-6"> {/* Đã giảm padding từ p-8 xuống p-6 */}
                     <div className="w-full">
-                      <div className="w-full space-y-6">
+                      <div className="w-full">
                         <div>
-                          <h2 className="text-center text-3xl font-extrabold text-gray-900 mb-8">
+                          <h2 className="text-center text-2xl font-bold text-gray-900 mb-4"> {/* Đã giảm kích thước font và margin */}
                             Thêm bệnh nhân
                           </h2>
                         </div>
-                        <form className="space-y-6" onSubmit={async (event) => {
+                        <form className="space-y-4" onSubmit={async (event) => { {/* Đã giảm spacing từ space-y-6 xuống space-y-4 */}
                             event.preventDefault();
 
                             // Get form data
@@ -297,7 +427,7 @@ const PatientManagement: React.FC = () => {
                                 alert('Lỗi khi thêm bệnh nhân');
                             }
                         }}>
-                          <div className="space-y-4">
+                          <div className="grid grid-cols-2 gap-3"> {/* Chuyển từ layout dọc sang layout 2 cột để tiết kiệm không gian */}
                             <div>
                               <label
                                 htmlFor="name"
@@ -309,7 +439,7 @@ const PatientManagement: React.FC = () => {
                                 id="name"
                                 name="name"
                                 type="text"
-                                className="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-base"
+                                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
                                 placeholder="Nhập họ và tên"
                                 defaultValue=""
                               />
@@ -325,7 +455,7 @@ const PatientManagement: React.FC = () => {
                                 id="dob"
                                 name="dob"
                                 type="date"
-                                className="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-base"
+                                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
                                 defaultValue=""
                               />
                             </div>
@@ -339,7 +469,7 @@ const PatientManagement: React.FC = () => {
                               <select
                                 id="gender"
                                 name="gender"
-                                className="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-base"
+                                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
                                 defaultValue=""
                               >
                                 <option value="" disabled>
@@ -361,7 +491,7 @@ const PatientManagement: React.FC = () => {
                                 id="condition"
                                 name="condition"
                                 type="text"
-                                className="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-base"
+                                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
                                 placeholder="Nhập tình trạng bệnh"
                                 defaultValue=""
                               />
@@ -377,23 +507,7 @@ const PatientManagement: React.FC = () => {
                                 id="next_appointment"
                                 name="next_appointment"
                                 type="date"
-                                className="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-base"
-                                defaultValue=""
-                              />
-                            </div>
-                            <div>
-                              <label
-                                htmlFor="history"
-                                className="block text-sm font-medium text-gray-700 mb-1"
-                              >
-                                Lịch sử khám bệnh
-                              </label>
-                              <textarea
-                                id="history"
-                                name="history"
-                                rows={3}
-                                className="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-base"
-                                placeholder="Nhập lịch sử khám bệnh"
+                                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
                                 defaultValue=""
                               />
                             </div>
@@ -408,15 +522,38 @@ const PatientManagement: React.FC = () => {
                                 id="mri_images"
                                 name="mri_images"
                                 type="file"
-                                multiple
-                                className="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-base"
+                                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
                               />
                             </div>
                           </div>
-                          <div>
+                          <div> {/* Trường nhập lịch sử khám bệnh sử dụng không gian đầy đủ */}
+                            <label
+                              htmlFor="history"
+                              className="block text-sm font-medium text-gray-700 mb-1"
+                            >
+                              Lịch sử khám bệnh
+                            </label>
+                            {/* Giảm số dòng từ 3 xuống 2 */}
+                            <textarea
+                              id="history"
+                              name="history"
+                              rows={2}
+                              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+                              placeholder="Nhập lịch sử khám bệnh"
+                              defaultValue=""
+                            />
+                          </div>
+                          <div className="flex justify-between mt-4"> {/* Giảm margin-top */}
+                            <button
+                              type="button"
+                              onClick={() => setAddShow(false)}
+                              className="py-2 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors duration-200"
+                            >
+                              Hủy bỏ
+                            </button>
                             <button
                               type="submit"
-                              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-medium text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors duration-200"
+                              className="flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors duration-200"
                             >
                               Thêm bệnh nhân
                             </button>
@@ -510,9 +647,7 @@ const PatientManagement: React.FC = () => {
                       <div className="grid grid-cols-2 gap-2">
                         <button
                           className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-                          onClick={() => {
-                            /* TODO: Implement view history */
-                          }}
+                          onClick={() => setCurrentView("patient-history")}
                         >
                           Xem lịch sử khám bệnh
                         </button>
