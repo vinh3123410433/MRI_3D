@@ -4,7 +4,8 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import listPlugin from '@fullcalendar/list';
 import interactionPlugin from '@fullcalendar/interaction';
-import { EventClickArg, EventChangeArg, DateClickArg } from '@fullcalendar/core';
+import { EventClickArg, EventChangeArg } from '@fullcalendar/core';
+import { DateClickArg } from '@fullcalendar/interaction';
 import viLocale from '@fullcalendar/core/locales/vi';
 
 interface Appointment {
