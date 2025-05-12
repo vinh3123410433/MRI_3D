@@ -1,4 +1,5 @@
 // MRI Data storage and management service using IndexedDB
+import dbManager from './DatabaseManager';
 
 export interface MriData {
   id: string;
@@ -14,145 +15,111 @@ export interface MriData {
   };
 }
 
+// Interface for storage format - Float32Array can't be stored directly in IndexedDB
+interface StorageMriData {
+  id: string;
+  patientId: string;
+  name: string;
+  date: string;
+  data: number[]; // Stored as regular array
+  dimensions: [number, number, number];
+  slices: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  dataSize: number; // Size in bytes
+}
+
 class MriService {
   private mriData: MriData[] = [];
   private storageKey = 'mri_data_index';
-  private dbName = 'mri_database';
-  private dbVersion = 1;
-  private db: IDBDatabase | null = null;
-  private maxRetries = 3;
+  private isInitialized = false;
+  private initPromise: Promise<void> | null = null;
 
   constructor() {
-    this.initDatabase().catch(error => {
-      console.error('Error initializing MRI database:', error);
-      // Fallback to localStorage if IndexedDB fails
-      this.loadFromLocalStorage();
-    });
+    this.initialize();
   }
-
-  // Initialize the IndexedDB database
-  private async initDatabase(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      let retryCount = 0;
-      const tryOpen = () => {
-        const request = indexedDB.open(this.dbName, this.dbVersion);
-        
-        request.onerror = (event) => {
-          console.error('IndexedDB error:', event);
-          if (retryCount < this.maxRetries) {
-            retryCount++;
-            console.log(`Retrying database open (attempt ${retryCount})...`);
-            setTimeout(tryOpen, 1000);
-          } else {
-            reject('Failed to open database after multiple attempts');
-          }
-        };
-        
-        request.onsuccess = (event) => {
-          this.db = (event.target as IDBOpenDBRequest).result;
-          
-          // Add error handler for the database
-          this.db.onerror = (event) => {
-            console.error('Database error:', event);
-          };
-          
-          this.loadData();
-          resolve();
-        };
-        
-        request.onupgradeneeded = (event) => {
-          const db = (event.target as IDBOpenDBRequest).result;
-          
-          if (!db.objectStoreNames.contains('mri_data')) {
-            const store = db.createObjectStore('mri_data', { keyPath: 'id' });
-            store.createIndex('patientId', 'patientId', { unique: false });
-            
-            // Add validation for data size
-            store.createIndex('dataSize', 'dataSize', { unique: false });
-          }
-        };
-      };
-      
-      tryOpen();
-    });
-  }
-
-  // Ensure database is initialized with retry mechanism
-  private async ensureDbInitialized(): Promise<IDBDatabase> {
-    let retries = 0;
-    while (!this.db && retries < this.maxRetries) {
-      try {
-        await this.initDatabase();
-        retries++;
-        if (!this.db) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      } catch (error) {
-        console.error(`Database initialization retry ${retries} failed:`, error);
-      }
+  // Initialize the service
+  private initialize(): Promise<void> {
+    if (this.isInitialized) {
+      return Promise.resolve();
     }
     
-    if (!this.db) {
-      throw new Error('Failed to initialize database');
+    if (!this.initPromise) {
+      this.initPromise = this.loadData()
+        .then(() => {
+          this.isInitialized = true;
+        })
+        .catch(error => {
+          console.error('Error initializing MRI service:', error);
+          // Fallback to localStorage if IndexedDB fails
+          this.loadFromLocalStorage();
+          this.isInitialized = true;
+        });
     }
     
-    return this.db;
-  }
-
-  // Load data from IndexedDB
+    return this.initPromise;
+  }// Load data from IndexedDB
   private async loadData(): Promise<void> {
     try {
-      const db = await this.ensureDbInitialized();
-      this.mriData = await this.getAllMriDataFromDb(db);
+      console.log('Loading MRI data from IndexedDB...');
+      
+      // Get all MRI data from database
+      const storageMriData = await dbManager.getAll<StorageMriData>('mri_data');
+      console.log(`Found ${storageMriData.length} MRI records in database`);
+      
+      // Convert back to MriData with Float32Array
+      const validMriData: MriData[] = [];
+      
+      for (const storedData of storageMriData) {
+        try {
+          // Make sure we have valid data to convert
+          if (!storedData.data || !Array.isArray(storedData.data)) {
+            console.warn(`Invalid MRI data found for ID ${storedData.id}, patientId: ${storedData.patientId}`);
+            continue;
+          }
+          
+          validMriData.push({
+            id: storedData.id,
+            patientId: storedData.patientId,
+            name: storedData.name,
+            date: storedData.date,
+            data: Float32Array.from(storedData.data),
+            dimensions: storedData.dimensions,
+            slices: storedData.slices
+          });
+        } catch (err) {
+          console.error(`Error processing MRI data for ID ${storedData.id}:`, err);
+        }
+      }
+      
+      this.mriData = validMriData;
+      console.log(`Successfully loaded ${this.mriData.length} valid MRI records`);
+      this.isInitialized = true;
     } catch (error) {
-      console.error('Error loading data from IndexedDB:', error);
+      console.error('Error loading MRI data from IndexedDB:', error);
       this.loadFromLocalStorage();
     }
-  }
-
-  // Get all MRI data from the database
-  private getAllMriDataFromDb(db: IDBDatabase): Promise<MriData[]> {
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction('mri_data', 'readonly');
-      const store = transaction.objectStore('mri_data');
-      const request = store.getAll();
-      
-      request.onsuccess = () => {
-        // Convert the ArrayBuffer data back to Float32Array
-        const results = request.result || [];
-        const convertedResults = results.map(mri => ({
-          ...mri,
-          data: mri.data instanceof Float32Array ? mri.data : Float32Array.from(mri.data)
-        }));
-        resolve(convertedResults);
-      };
-      
-      request.onerror = (event) => {
-        console.error('Error getting MRI data:', event);
-        reject(event);
-      };
-    });
   }
 
   // Clean up failed or incomplete uploads
   private async cleanupFailedUploads(): Promise<void> {
     try {
-      const db = await this.ensureDbInitialized();
-      const transaction = db.transaction('mri_data', 'readwrite');
-      const store = transaction.objectStore('mri_data');
-
-      const mriData = await this.getAllMriDataFromDb(db);
       const now = Date.now();
       const ONE_HOUR = 60 * 60 * 1000;
+      
+      // Get all MRI data from database
+      const mriData = await dbManager.getAll<StorageMriData>('mri_data');
 
-      // Find and remove incomplete uploads (those without proper data)
+      // Find incomplete uploads (those without proper data)
       const incompleteUploads = mriData.filter(mri => {
         const isIncomplete = !mri.data || 
-                           !mri.dimensions || 
-                           !mri.slices ||
-                           !Array.isArray(mri.dimensions) ||
-                           mri.dimensions.length !== 3 ||
-                           mri.data.length !== mri.dimensions[0] * mri.dimensions[1] * mri.dimensions[2];
+                          !mri.dimensions || 
+                          !mri.slices ||
+                          !Array.isArray(mri.dimensions) ||
+                          mri.dimensions.length !== 3 ||
+                          mri.data.length !== mri.dimensions[0] * mri.dimensions[1] * mri.dimensions[2];
 
         // Also check if it's a stale upload (older than 1 hour)
         const timestamp = parseInt(mri.id.split('_')[1]);
@@ -163,11 +130,7 @@ class MriService {
 
       // Remove incomplete uploads
       for (const mri of incompleteUploads) {
-        await new Promise<void>((resolve, reject) => {
-          const request = store.delete(mri.id);
-          request.onsuccess = () => resolve();
-          request.onerror = () => reject();
-        });
+        await dbManager.delete('mri_data', mri.id);
         // Also remove from local cache
         this.mriData = this.mriData.filter(m => m.id !== mri.id);
       }
@@ -191,6 +154,8 @@ class MriService {
     dimensions: [number, number, number],
     slices: { x: number, y: number, z: number }
   ): Promise<MriData> {
+    await this.initialize();
+
     try {
       // Run cleanup before saving new data
       await this.cleanupFailedUploads();
@@ -222,27 +187,14 @@ class MriService {
         slices
       };
 
-      const db = await this.ensureDbInitialized();
-      const transaction = db.transaction('mri_data', 'readwrite');
-      const store = transaction.objectStore('mri_data');
-
       // Save size information for validation
-      const storageMriScan = {
+      const storageMriScan: StorageMriData = {
         ...mriScan,
         data: Array.from(data),
         dataSize: data.length * 4 // Size in bytes (Float32 = 4 bytes)
       };
 
-      await new Promise<void>((resolve, reject) => {
-        const request = store.add(storageMriScan);
-        
-        request.onsuccess = () => resolve();
-        
-        request.onerror = (event) => {
-          console.error('Error storing MRI data:', event);
-          reject(new Error('Failed to store MRI data'));
-        };
-      });
+      await dbManager.add('mri_data', storageMriScan);
 
       // Update local cache
       this.mriData.push(mriScan);
@@ -255,7 +207,6 @@ class MriService {
       }
 
       return mriScan;
-
     } catch (error) {
       console.error('Error saving MRI data:', error);
       
@@ -269,34 +220,38 @@ class MriService {
       throw new Error(error instanceof Error ? error.message : 'Failed to save MRI data');
     }
   }
-
   // Get all MRI data for a specific patient
-  getMriDataForPatient(patientId: string): MriData[] {
-    return this.mriData.filter(mri => mri.patientId === patientId);
+  async getMriDataForPatient(patientId: string): Promise<MriData[]> {
+    try {
+      await this.initialize();
+      
+      // Ensure we have the latest data by re-querying if needed
+      if (!this.isInitialized || this.mriData.length === 0) {
+        await this.loadData();
+      }
+      
+      return this.mriData.filter(mri => mri.patientId === patientId);
+    } catch (error) {
+      console.error(`Error getting MRI data for patient ${patientId}:`, error);
+      return [];
+    }
   }
 
   // Get specific MRI data by ID
-  getMriDataById(id: string): MriData | undefined {
+  async getMriDataById(id: string): Promise<MriData | undefined> {
+    await this.initialize();
     return this.mriData.find(mri => mri.id === id);
   }
 
   // Delete MRI data
   async deleteMriData(id: string): Promise<boolean> {
+    await this.initialize();
+    
     try {
-      const db = await this.ensureDbInitialized();
-      const transaction = db.transaction('mri_data', 'readwrite');
-      const store = transaction.objectStore('mri_data');
-      
-      await new Promise<void>((resolve, reject) => {
-        const request = store.delete(id);
-        request.onsuccess = () => resolve();
-        request.onerror = (event) => reject(event);
-      });
+      await dbManager.delete('mri_data', id);
       
       // Update local cache
       this.mriData = this.mriData.filter(mri => mri.id !== id);
-      
-      // Fallback save to localStorage
       this.saveToLocalStorage();
       
       return true;

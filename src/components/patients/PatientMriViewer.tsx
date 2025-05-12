@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { OrbitControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import VolumeMesh from "../models/VolumeMesh";
@@ -10,10 +10,48 @@ interface PatientMriViewerProps {
 }
 
 const PatientMriViewer: React.FC<PatientMriViewerProps> = ({ patientId, onClose }) => {
-  const [patientMris] = useState<MriData[]>(mriService.getMriDataForPatient(patientId));
-  const [activeMriIndex, setActiveMriIndex] = useState<number>(patientMris.length > 0 ? 0 : -1);
+  const [patientMris, setPatientMris] = useState<MriData[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [activeMriIndex, setActiveMriIndex] = useState<number>(-1);
   const [viewMode, setViewMode] = useState<'3d' | 'slices'>('3d');
-
+  
+  useEffect(() => {
+    const loadMriData = async () => {
+      try {
+        setLoading(true);
+        const data = await mriService.getMriDataForPatient(patientId);
+        setPatientMris(data);
+        setActiveMriIndex(data.length > 0 ? 0 : -1);
+      } catch (error) {
+        console.error("Error loading MRI data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadMriData();
+  }, [patientId]);
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow-lg p-6 max-w-4xl mx-auto">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold text-blue-600">MRI 3D</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="h-96 flex items-center justify-center">
+          <p className="text-lg text-gray-600">Đang tải dữ liệu MRI...</p>
+        </div>
+      </div>
+    );
+  }
+  
   if (patientMris.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow-lg p-6 max-w-4xl mx-auto">

@@ -1,4 +1,5 @@
 // Appointment data service using IndexedDB for storage
+import dbManager from './DatabaseManager';
 
 export interface Appointment {
   id: string;
@@ -20,235 +21,156 @@ export interface DateNote {
 }
 
 class AppointmentService {
-  private dbName = 'mri_database';
-  private dbVersion = 1;
-  private db: IDBDatabase | null = null;
   private appointments: Appointment[] = [];
   private dateNotes: DateNote[] = [];
   private appointmentsStorageKey = 'appointments';
   private dateNotesStorageKey = 'date_notes';
+  private isInitialized = false;
+  private initPromise: Promise<void> | null = null;
   
   constructor() {
-    this.initDatabase().catch(error => {
-      console.error('Error initializing appointment database:', error);
-      // Fallback to localStorage if IndexedDB fails
-      this.loadFromLocalStorage();
-    });
+    this.initialize();
   }
   
-  // Initialize the IndexedDB database
-  private async initDatabase(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.dbName, this.dbVersion);
-      
-      request.onerror = (event) => {
-        console.error('IndexedDB error:', event);
-        reject('Failed to open database');
-      };
-      
-      request.onsuccess = (event) => {
-        this.db = (event.target as IDBOpenDBRequest).result;
-        this.loadData();
-        resolve();
-      };
-      
-      request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-        
-        // Create appointments store if it doesn't exist
-        if (!db.objectStoreNames.contains('appointments')) {
-          db.createObjectStore('appointments', { keyPath: 'id' });
-        }
-        
-        // Create date notes store if it doesn't exist
-        if (!db.objectStoreNames.contains('date_notes')) {
-          db.createObjectStore('date_notes', { keyPath: 'date' });
-        }
-      };
-    });
-  }
-  
-  // Ensure database is initialized
-  private async ensureDbInitialized(): Promise<IDBDatabase> {
-    if (!this.db) {
-      await this.initDatabase();
+  // Initialize the service
+  private initialize(): Promise<void> {
+    if (this.isInitialized) {
+      return Promise.resolve();
     }
     
-    if (!this.db) {
-      throw new Error('Failed to initialize database');
+    if (!this.initPromise) {
+      this.initPromise = this.loadData().catch(error => {
+        console.error('Error initializing appointment service:', error);
+        // Fallback to localStorage if IndexedDB fails
+        this.loadFromLocalStorage();
+      });
     }
     
-    return this.db;
+    return this.initPromise;
   }
   
   // Load data from IndexedDB
   private async loadData(): Promise<void> {
     try {
-      const db = await this.ensureDbInitialized();
-      
       // Load appointments
-      this.appointments = await this.getAllAppointmentsFromDb(db);
+      this.appointments = await dbManager.getAll<Appointment>('appointments');
       
       // Load date notes
-      this.dateNotes = await this.getAllDateNotesFromDb(db);
+      this.dateNotes = await dbManager.getAll<DateNote>('date_notes');
+      
+      this.isInitialized = true;
     } catch (error) {
       console.error('Error loading data from IndexedDB:', error);
       this.loadFromLocalStorage();
     }
   }
   
-  // Get all appointments from the database
-  private getAllAppointmentsFromDb(db: IDBDatabase): Promise<Appointment[]> {
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction('appointments', 'readonly');
-      const store = transaction.objectStore('appointments');
-      const request = store.getAll();
-      
-      request.onsuccess = () => {
-        resolve(request.result || []);
-      };
-      
-      request.onerror = (event) => {
-        console.error('Error getting appointments:', event);
-        reject(event);
-      };
-    });
-  }
-  
-  // Get all date notes from the database
-  private getAllDateNotesFromDb(db: IDBDatabase): Promise<DateNote[]> {
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction('date_notes', 'readonly');
-      const store = transaction.objectStore('date_notes');
-      const request = store.getAll();
-      
-      request.onsuccess = () => {
-        resolve(request.result || []);
-      };
-      
-      request.onerror = (event) => {
-        console.error('Error getting date notes:', event);
-        reject(event);
-      };
-    });
-  }
-  
-  // Fallback to localStorage if IndexedDB fails
+  // Load from localStorage as fallback
   private loadFromLocalStorage(): void {
     try {
+      // Load appointments
       const appointmentsData = localStorage.getItem(this.appointmentsStorageKey);
       if (appointmentsData) {
         this.appointments = JSON.parse(appointmentsData);
       }
       
+      // Load date notes
       const dateNotesData = localStorage.getItem(this.dateNotesStorageKey);
       if (dateNotesData) {
         this.dateNotes = JSON.parse(dateNotesData);
       }
     } catch (error) {
-      console.error('Error loading from localStorage:', error);
-      // Initialize with empty arrays if loading fails
+      console.error('Error loading appointment data from localStorage:', error);
       this.appointments = [];
       this.dateNotes = [];
     }
   }
   
   // Save to localStorage as fallback
-  private saveToLocalStorage(): void {
+  private saveAppointmentsToLocalStorage(): void {
     try {
       localStorage.setItem(this.appointmentsStorageKey, JSON.stringify(this.appointments));
-      localStorage.setItem(this.dateNotesStorageKey, JSON.stringify(this.dateNotes));
     } catch (error) {
-      console.error('Error saving to localStorage:', error);
+      console.error('Error saving appointments to localStorage:', error);
     }
   }
   
-  // Public methods
+  private saveDateNotesToLocalStorage(): void {
+    try {
+      localStorage.setItem(this.dateNotesStorageKey, JSON.stringify(this.dateNotes));
+    } catch (error) {
+      console.error('Error saving date notes to localStorage:', error);
+    }
+  }
   
-  // Get all appointments (from memory cache)
-  getAllAppointments(): Appointment[] {
+  // Get all appointments
+  async getAllAppointments(): Promise<Appointment[]> {
+    await this.initialize();
     return [...this.appointments];
   }
   
-  // Get all date notes (from memory cache)
-  getAllDateNotes(): DateNote[] {
-    return [...this.dateNotes];
+  // Get appointment by ID
+  async getAppointmentById(id: string): Promise<Appointment | undefined> {
+    await this.initialize();
+    return this.appointments.find(appointment => appointment.id === id);
   }
   
   // Add a new appointment
-  async addAppointment(appointment: Appointment): Promise<Appointment> {
+  async addAppointment(appointmentData: Omit<Appointment, 'id'>): Promise<Appointment> {
+    await this.initialize();
+    
+    const newAppointment: Appointment = {
+      ...appointmentData,
+      id: `apt_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+    };
+    
     try {
-      const db = await this.ensureDbInitialized();
-      
-      // Ensure the appointment has an ID
-      if (!appointment.id) {
-        appointment.id = `appointment_${Date.now()}`;
-      }
-      
-      // Store in IndexedDB
-      const transaction = db.transaction('appointments', 'readwrite');
-      const store = transaction.objectStore('appointments');
-      await new Promise<void>((resolve, reject) => {
-        const request = store.add(appointment);
-        request.onsuccess = () => resolve();
-        request.onerror = (event) => reject(event);
-      });
+      await dbManager.add('appointments', newAppointment);
       
       // Update local cache
-      this.appointments.push(appointment);
+      this.appointments.push(newAppointment);
+      this.saveAppointmentsToLocalStorage();
+      
+      return newAppointment;
+    } catch (error) {
+      console.error('IndexedDB error, falling back to localStorage:', error);
       
       // Fallback save to localStorage
-      this.saveToLocalStorage();
+      this.appointments.push(newAppointment);
+      this.saveAppointmentsToLocalStorage();
       
-      return appointment;
-    } catch (error) {
-      console.error('Error adding appointment:', error);
-      
-      // Fallback to localStorage only
-      this.appointments.push(appointment);
-      this.saveToLocalStorage();
-      
-      return appointment;
+      return newAppointment;
     }
   }
   
   // Update an existing appointment
   async updateAppointment(appointment: Appointment): Promise<Appointment> {
+    await this.initialize();
+    
     try {
-      const db = await this.ensureDbInitialized();
-      
-      // Store in IndexedDB
-      const transaction = db.transaction('appointments', 'readwrite');
-      const store = transaction.objectStore('appointments');
-      await new Promise<void>((resolve, reject) => {
-        const request = store.put(appointment);
-        request.onsuccess = () => resolve();
-        request.onerror = (event) => reject(event);
-      });
+      await dbManager.put('appointments', appointment);
       
       // Update local cache
-      const index = this.appointments.findIndex(apt => apt.id === appointment.id);
+      const index = this.appointments.findIndex(a => a.id === appointment.id);
       if (index >= 0) {
         this.appointments[index] = appointment;
       } else {
         this.appointments.push(appointment);
       }
-      
-      // Fallback save to localStorage
-      this.saveToLocalStorage();
+      this.saveAppointmentsToLocalStorage();
       
       return appointment;
     } catch (error) {
-      console.error('Error updating appointment:', error);
+      console.error('IndexedDB error, falling back to localStorage:', error);
       
-      // Fallback to localStorage only
-      const index = this.appointments.findIndex(apt => apt.id === appointment.id);
+      // If IndexedDB fails, continue with localStorage only
+      const index = this.appointments.findIndex(a => a.id === appointment.id);
       if (index >= 0) {
         this.appointments[index] = appointment;
       } else {
         this.appointments.push(appointment);
       }
-      this.saveToLocalStorage();
+      this.saveAppointmentsToLocalStorage();
       
       return appointment;
     }
@@ -256,73 +178,69 @@ class AppointmentService {
   
   // Delete an appointment
   async deleteAppointment(appointmentId: string): Promise<boolean> {
+    await this.initialize();
+    
     try {
-      const db = await this.ensureDbInitialized();
-      
-      // Delete from IndexedDB
-      const transaction = db.transaction('appointments', 'readwrite');
-      const store = transaction.objectStore('appointments');
-      await new Promise<void>((resolve, reject) => {
-        const request = store.delete(appointmentId);
-        request.onsuccess = () => resolve();
-        request.onerror = (event) => reject(event);
-      });
+      await dbManager.delete('appointments', appointmentId);
       
       // Update local cache
-      this.appointments = this.appointments.filter(apt => apt.id !== appointmentId);
-      
-      // Fallback save to localStorage
-      this.saveToLocalStorage();
+      this.appointments = this.appointments.filter(a => a.id !== appointmentId);
+      this.saveAppointmentsToLocalStorage();
       
       return true;
     } catch (error) {
-      console.error('Error deleting appointment:', error);
+      console.error('IndexedDB error, falling back to localStorage:', error);
       
-      // Fallback to localStorage only
-      this.appointments = this.appointments.filter(apt => apt.id !== appointmentId);
-      this.saveToLocalStorage();
+      // Fallback delete from localStorage
+      this.appointments = this.appointments.filter(a => a.id !== appointmentId);
+      this.saveAppointmentsToLocalStorage();
       
       return true;
     }
   }
   
+  // Get all date notes
+  async getAllDateNotes(): Promise<DateNote[]> {
+    await this.initialize();
+    return [...this.dateNotes];
+  }
+  
+  // Get a specific date note
+  async getDateNote(date: string): Promise<DateNote | undefined> {
+    await this.initialize();
+    return this.dateNotes.find(note => note.date === date);
+  }
+  
   // Save a date note
-  async saveDateNote(dateNote: DateNote): Promise<DateNote> {
+  async saveDateNote(date: string, note: string): Promise<DateNote> {
+    await this.initialize();
+    
+    const dateNote: DateNote = { date, note };
+    
     try {
-      const db = await this.ensureDbInitialized();
-      
-      // Store in IndexedDB
-      const transaction = db.transaction('date_notes', 'readwrite');
-      const store = transaction.objectStore('date_notes');
-      await new Promise<void>((resolve, reject) => {
-        const request = store.put(dateNote);
-        request.onsuccess = () => resolve();
-        request.onerror = (event) => reject(event);
-      });
+      await dbManager.put('date_notes', dateNote);
       
       // Update local cache
-      const index = this.dateNotes.findIndex(note => note.date === dateNote.date);
+      const index = this.dateNotes.findIndex(n => n.date === date);
       if (index >= 0) {
         this.dateNotes[index] = dateNote;
       } else {
         this.dateNotes.push(dateNote);
       }
-      
-      // Fallback save to localStorage
-      this.saveToLocalStorage();
+      this.saveDateNotesToLocalStorage();
       
       return dateNote;
     } catch (error) {
       console.error('Error saving date note:', error);
       
-      // Fallback to localStorage only
-      const index = this.dateNotes.findIndex(note => note.date === dateNote.date);
+      // Fallback to localStorage
+      const index = this.dateNotes.findIndex(n => n.date === date);
       if (index >= 0) {
         this.dateNotes[index] = dateNote;
       } else {
         this.dateNotes.push(dateNote);
       }
-      this.saveToLocalStorage();
+      this.saveDateNotesToLocalStorage();
       
       return dateNote;
     }
@@ -330,31 +248,22 @@ class AppointmentService {
   
   // Delete a date note
   async deleteDateNote(date: string): Promise<boolean> {
+    await this.initialize();
+    
     try {
-      const db = await this.ensureDbInitialized();
-      
-      // Delete from IndexedDB
-      const transaction = db.transaction('date_notes', 'readwrite');
-      const store = transaction.objectStore('date_notes');
-      await new Promise<void>((resolve, reject) => {
-        const request = store.delete(date);
-        request.onsuccess = () => resolve();
-        request.onerror = (event) => reject(event);
-      });
+      await dbManager.delete('date_notes', date);
       
       // Update local cache
-      this.dateNotes = this.dateNotes.filter(note => note.date !== date);
-      
-      // Fallback save to localStorage
-      this.saveToLocalStorage();
+      this.dateNotes = this.dateNotes.filter(n => n.date !== date);
+      this.saveDateNotesToLocalStorage();
       
       return true;
     } catch (error) {
-      console.error('Error deleting date note:', error);
+      console.error('IndexedDB error, falling back to localStorage:', error);
       
-      // Fallback to localStorage only
-      this.dateNotes = this.dateNotes.filter(note => note.date !== date);
-      this.saveToLocalStorage();
+      // Fallback delete from localStorage
+      this.dateNotes = this.dateNotes.filter(n => n.date !== date);
+      this.saveDateNotesToLocalStorage();
       
       return true;
     }
@@ -362,20 +271,27 @@ class AppointmentService {
   
   // Check if a time slot has a conflict with existing appointments
   hasTimeConflict(startTime: Date, endTime: Date, excludeAppointmentId?: string): boolean {
+    // Convert to timestamps for easier comparison
+    const startTimestamp = startTime.getTime();
+    const endTimestamp = endTime.getTime();
+    
     return this.appointments.some(appointment => {
-      // Skip the appointment being updated
+      // Skip the appointment with excludeAppointmentId if provided
       if (excludeAppointmentId && appointment.id === excludeAppointmentId) {
         return false;
       }
       
-      const appointmentStart = new Date(appointment.start);
-      const appointmentEnd = appointment.end ? new Date(appointment.end) : new Date(appointmentStart.getTime() + 30 * 60000);
+      // Get the existing appointment start and end times
+      const existingStart = new Date(appointment.start).getTime();
+      const existingEnd = appointment.end 
+        ? new Date(appointment.end).getTime() 
+        : existingStart + (60 * 60 * 1000); // Default to 1 hour if no end time
       
-      // Check if the time slots overlap
+      // Check for overlap
       return (
-        (startTime >= appointmentStart && startTime < appointmentEnd) ||
-        (endTime > appointmentStart && endTime <= appointmentEnd) ||
-        (startTime <= appointmentStart && endTime >= appointmentEnd)
+        (startTimestamp >= existingStart && startTimestamp < existingEnd) || // New start time within existing appointment
+        (endTimestamp > existingStart && endTimestamp <= existingEnd) || // New end time within existing appointment
+        (startTimestamp <= existingStart && endTimestamp >= existingEnd) // New appointment completely covers existing one
       );
     });
   }

@@ -42,16 +42,25 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
     show: false,
     message: ""
   });
-  
-  // Load appointments and date notes on mount
+    // Load appointments and date notes on mount
   useEffect(() => {
-    const loadedAppointments = initialAppointments.length > 0 
-      ? initialAppointments 
-      : appointmentService.getAllAppointments();
-    setAppointments(loadedAppointments);
-    
-    const loadedDateNotes = appointmentService.getAllDateNotes();
-    setDateNotes(loadedDateNotes);
+    const fetchData = async () => {
+      try {
+        // If we have initialAppointments, use those, otherwise load from service
+        const loadedAppointments = initialAppointments.length > 0 
+          ? initialAppointments 
+          : await appointmentService.getAllAppointments();
+        setAppointments(loadedAppointments);
+        
+        // Load date notes
+        const loadedDateNotes = await appointmentService.getAllDateNotes();
+        setDateNotes(loadedDateNotes);
+      } catch (error) {
+        console.error('Failed to load calendar data:', error);
+      }
+    };
+
+    fetchData();
   }, [initialAppointments]);
 
   // Check if a time slot has a conflict with existing appointments
@@ -238,9 +247,8 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
         note: dateNote
       };
       
-      try {
-        // Save in the service
-        await appointmentService.saveDateNote(newDateNote);
+      try {        // Save in the service 
+        await appointmentService.saveDateNote(dateString, dateNote);
         
         // Update local state
         const existingNoteIndex = dateNotes.findIndex(note => note.date === dateString);

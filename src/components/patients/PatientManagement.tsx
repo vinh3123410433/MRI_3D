@@ -13,6 +13,7 @@ const PatientManagement: React.FC = () => {
   const [addShow, setAddShow] = useState<boolean>(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [currentView, setCurrentView] = useState<View>("patients");
+  const [mriCountsByPatient, setMriCountsByPatient] = useState<Record<string, number>>({});
   
   // Load patients when component mounts
   useEffect(() => {
@@ -57,16 +58,38 @@ const PatientManagement: React.FC = () => {
     setCurrentView("patients");
   };
 
-  // Check if the selected patient has any MRI scans
+  // Check if the selected patient has any MRI scans  const [mriCountsByPatient, setMriCountsByPatient] = useState<Record<string, number>>({});
+  
+  // Load MRI counts for patients
+  useEffect(() => {
+    const loadMriCounts = async () => {
+      const counts: Record<string, number> = {};
+      
+      for (const patient of patients) {
+        try {
+          const scans = await mriService.getMriDataForPatient(patient.id);
+          counts[patient.id] = scans.length;
+        } catch (error) {
+          console.error(`Error loading MRI data for patient ${patient.id}:`, error);
+          counts[patient.id] = 0;
+        }
+      }
+      
+      setMriCountsByPatient(counts);
+    };
+    
+    if (patients.length > 0) {
+      loadMriCounts();
+    }
+  }, [patients]);
+
   const hasMriScans = (patientId: string) => {
-    const scans = mriService.getMriDataForPatient(patientId);
-    return scans.length > 0;
+    return (mriCountsByPatient[patientId] || 0) > 0;
   };
 
   // Get the count of MRI scans for the selected patient
   const getMriScanCount = (patientId: string) => {
-    const scans = mriService.getMriDataForPatient(patientId);
-    return scans.length;
+    return mriCountsByPatient[patientId] || 0;
   };
 
   const handleAddPatient = async (event: React.FormEvent<HTMLFormElement>) => {
