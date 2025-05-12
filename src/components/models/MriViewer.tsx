@@ -252,6 +252,12 @@ const Mri3dView: React.FC<{
   );
 };
 
+// Thêm state và interfaces 
+interface UploadProgress {
+  stage: 'reading' | 'processing' | 'complete';
+  progress: number;
+}
+
 const MriViewer: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [mriData, setMriData] = useState<MriData | null>(null);
@@ -261,46 +267,83 @@ const MriViewer: React.FC = () => {
   const [viewMode, setViewMode] = useState<"3d" | "slices">("slices");
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
 
-  const handleFileUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Add file size check
+    const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+    if (file.size > MAX_FILE_SIZE) {
+      setError("File quá lớn. Vui lòng chọn file nhỏ hơn 100MB");
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
-    const reader = new FileReader();
+    setUploadProgress({ stage: 'reading', progress: 0 });
 
-    reader.onload = async (e) => {
-      try {
-        const buffer = e.target?.result as ArrayBuffer;
-        processNiftiBuffer(buffer);
-      } catch (error) {
-        console.error("Error processing MRI file:", error);
-        setError(
-          error instanceof Error
-            ? error.message
-            : "Có lỗi xảy ra khi xử lý file MRI"
-        );
-        setIsLoading(false);
-      }
-    };
+    // Add timeout
+    const timeout = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Xử lý file quá lâu")), 30000);
+    });
 
-    reader.onerror = () => {
-      setError("Không thể đọc file. Vui lòng thử lại.");
+    const processFile = new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onprogress = (e) => {
+        if (e.lengthComputable) {
+          setUploadProgress({
+            stage: 'reading',
+            progress: (e.loaded / e.total) * 100
+          });
+        }
+      };
+
+      reader.onload = async (e) => {
+        try {
+          setUploadProgress({ stage: 'processing', progress: 0 });
+          const buffer = e.target?.result as ArrayBuffer;
+          await processNiftiBuffer(buffer);
+          setUploadProgress({ stage: 'complete', progress: 100 });
+          resolve(true);
+        } catch (error) {
+          reject(error);
+        }
+      };
+
+      reader.onerror = () => {
+        reject(new Error("Không thể đọc file. Vui lòng thử lại."));
+      };
+
+      reader.readAsArrayBuffer(file);
+    });
+
+    try {
+      await Promise.race([processFile, timeout]);
+    } catch (error) {
+      console.error("Error processing MRI file:", error);
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Có lỗi xảy ra khi xử lý file MRI"
+      );
+      // Reset progress on error
+      setUploadProgress(null);
+    } finally {
       setIsLoading(false);
-    };
-
-    reader.readAsArrayBuffer(file);
+    }
   };
 
   // Tách riêng hàm xử lý buffer để tái sử dụng
-  const processNiftiBuffer = (buffer: ArrayBuffer) => {
+  const processNiftiBuffer = async (buffer: ArrayBuffer) => {
     try {
       if (!buffer) {
         throw new Error("Không thể đọc file");
       }
+
+      setUploadProgress({ stage: 'processing', progress: 10 });
 
       const niftiHeader = NiftiReader.readHeader(buffer);
       if (!niftiHeader) {
@@ -308,15 +351,28 @@ const MriViewer: React.FC = () => {
       }
 
       console.log("Header:", niftiHeader);
+      setUploadProgress({ stage: 'processing', progress: 30 });
 
       const niftiImage = NiftiReader.readImage(niftiHeader, buffer);
       if (!niftiImage) {
         throw new Error("Không thể đọc dữ liệu hình ảnh NIFTI");
       }
 
-      if (!niftiHeader.dims || niftiHeader.dims.length < 4) {
+      setUploadProgress({ stage: 'processing', progress: 50 });
+
+      // Validate dimensions
+      if (!niftiHeader.dims || niftiHeader.dims.length < 4 || 
+          niftiHeader.dims[1] <= 0 || niftiHeader.dims[2] <= 0 || niftiHeader.dims[3] <= 0) {
         throw new Error("File NIFTI không có đủ thông tin về kích thước");
       }
+
+      // Validate total volume size
+      const totalSize = niftiHeader.dims[1] * niftiHeader.dims[2] * niftiHeader.dims[3];
+      if (totalSize > 512 * 512 * 512) {
+        throw new Error("File MRI quá lớn. Kích thước tối đa là 512x512x512");
+      }
+
+      setUploadProgress({ stage: 'processing', progress: 60 });
 
       const dimensions: [number, number, number] = [
         niftiHeader.dims[1],
@@ -336,21 +392,62 @@ const MriViewer: React.FC = () => {
       };
 
       const dataType = niftiHeader.datatypeCode;
-      const rawData = new (map_[dataType] || Float64Array)(niftiImage);
+      if (!map_[dataType]) {
+        throw new Error("Định dạng dữ liệu không được hỗ trợ");
+      }
 
+      setUploadProgress({ stage: 'processing', progress: 70 });
+
+      const rawData = new (map_[dataType])(niftiImage);
+      if (!rawData || rawData.length === 0) {
+        throw new Error("Không thể đọc dữ liệu ảnh");
+      }
+
+      // Find data range
       let min = Infinity;
       let max = -Infinity;
 
-      for (let i = 0; i < rawData.length; i++) {
-        const value = rawData[i];
-        min = Math.min(min, value);
-        max = Math.max(max, value);
+      try {
+        for (let i = 0; i < rawData.length; i++) {
+          if (!Number.isFinite(rawData[i])) {
+            throw new Error("Dữ liệu ảnh chứa giá trị không hợp lệ");
+          }
+          const value = rawData[i];
+          min = Math.min(min, value);
+          max = Math.max(max, value);
+        }
+      } catch (error) {
+        console.error("Error validating pixel values:", error);
+        throw new Error("Lỗi khi kiểm tra giá trị pixel trong ảnh");
       }
 
-      const data = new Float32Array(rawData.length);
-      for (let i = 0; i < rawData.length; i++) {
-        data[i] = (rawData[i] - min) / (max - min);
+      setUploadProgress({ stage: 'processing', progress: 85 });
+
+      if (min === max) {
+        throw new Error("Ảnh không chứa dữ liệu có ý nghĩa (giá trị đồng nhất)");
       }
+
+      // Normalize data to [0,1] range with error handling
+      const data = new Float32Array(rawData.length);
+      try {
+        const range = max - min;
+        if (range === 0) {
+          throw new Error("Không thể chuẩn hóa dữ liệu (khoảng giá trị bằng 0)");
+        }
+        
+        for (let i = 0; i < rawData.length; i++) {
+          data[i] = (rawData[i] - min) / range;
+          if (!Number.isFinite(data[i])) {
+            throw new Error("Lỗi chuẩn hóa dữ liệu: kết quả không hợp lệ");
+          }
+        }
+      } catch (e) {
+        const error = e as Error;
+        console.error("Normalization error:", error);
+        throw new Error("Lỗi khi chuẩn hóa dữ liệu: " + (error.message || "Không xác định"));
+      }
+
+      setUploadProgress({ stage: 'processing', progress: 95 });
 
       // Initialize with middle slices for each dimension
       const middleX = Math.floor(dimensions[0] / 2);
@@ -358,7 +455,7 @@ const MriViewer: React.FC = () => {
       const middleZ = Math.floor(dimensions[2] / 2);
 
       setMriData({
-        data: data,
+        data,
         dimensions,
         slices: {
           x: middleX,
@@ -366,15 +463,20 @@ const MriViewer: React.FC = () => {
           z: middleZ,
         },
       });
-      setIsLoading(false);
+
+      setUploadProgress({ stage: 'complete', progress: 100 });
     } catch (error) {
       console.error("Error processing NIFTI buffer:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Có lỗi xảy ra khi xử lý dữ liệu NIFTI"
-      );
-      setIsLoading(false);
+      
+      // Clean up references to large data
+      setMriData(null);
+      
+      // Let the browser know we don't need these anymore
+      if (buffer instanceof ArrayBuffer) {
+        buffer = new ArrayBuffer(0);
+      }
+      
+      throw error;
     }
   };
 
@@ -445,6 +547,22 @@ const MriViewer: React.FC = () => {
                 file:bg-primary file:text-white
                 hover:file:bg-blue-700"
             />
+            {uploadProgress && (
+              <div className="flex flex-col w-64">
+                <div className="flex justify-between text-xs mb-1">
+                  <span>{uploadProgress.stage === 'reading' ? 'Đang đọc file...' : 
+                         uploadProgress.stage === 'processing' ? 'Đang xử lý...' : 
+                         'Hoàn thành'}</span>
+                  <span>{Math.round(uploadProgress.progress)}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${uploadProgress.progress}%` }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
