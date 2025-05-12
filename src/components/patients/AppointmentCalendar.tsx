@@ -1,31 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import timeGridPlugin from '@fullcalendar/timegrid';
-import listPlugin from '@fullcalendar/list';
-import interactionPlugin from '@fullcalendar/interaction';
-import { EventClickArg, EventChangeArg } from '@fullcalendar/core';
-import { DateClickArg } from '@fullcalendar/interaction';
+import { EventChangeArg, EventClickArg } from '@fullcalendar/core';
 import viLocale from '@fullcalendar/core/locales/vi';
-
-interface Appointment {
-  id: string;
-  title: string;
-  start: string;
-  end?: string;
-  patient: {
-    id: string;
-    name: string;
-  };
-  description?: string;
-  doctorComment?: string;
-  backgroundColor?: string;
-}
-
-interface DateNote {
-  date: string; // ISO string date
-  note: string;
-}
+import dayGridPlugin from '@fullcalendar/daygrid';
+import interactionPlugin, { DateClickArg } from '@fullcalendar/interaction';
+import listPlugin from '@fullcalendar/list';
+import FullCalendar from '@fullcalendar/react';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import React, { useEffect, useRef, useState } from 'react';
+import appointmentService, { Appointment, DateNote } from '../../services/AppointmentService';
 
 interface AppointmentCalendarProps {
   initialAppointments?: Appointment[];
@@ -49,75 +30,33 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [comment, setComment] = useState("");
   
-  // State for notes on specific dates (not just appointments)
+  // State for appointments and date notes
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [dateNotes, setDateNotes] = useState<DateNote[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDateNoteModal, setShowDateNoteModal] = useState(false);
   const [dateNote, setDateNote] = useState("");
   
-  // Thêm state để hiển thị thông báo
+  // Notification state
   const [notification, setNotification] = useState<{show: boolean, message: string}>({
     show: false,
     message: ""
   });
   
-  // Sample appointments data
-  const defaultAppointments: Appointment[] = [
-    {
-      id: '1',
-      title: '7:45 Nguyễn V.A.',
-      start: new Date(2025, 3, 17, 7, 45).toISOString(),
-      end: new Date(2025, 3, 17, 8, 30).toISOString(),
-      patient: {
-        id: '1',
-        name: 'Nguyễn Văn An'
-      },
-      doctorComment: '',
-      backgroundColor: '#4CAF50'
-    },
-    {
-      id: '2',
-      title: '5:20 Trần T.B.',
-      start: new Date(2025, 3, 23, 17, 20).toISOString(),
-      end: new Date(2025, 3, 23, 18, 0).toISOString(),
-      patient: {
-        id: '2',
-        name: 'Trần Thị Bình'
-      },
-      doctorComment: '',
-      backgroundColor: '#2196F3'
-    },
-    {
-      id: '3',
-      title: '10:00 Lê V.C.',
-      start: new Date(2025, 3, 29, 10, 0).toISOString(),
-      end: new Date(2025, 3, 29, 10, 45).toISOString(),
-      patient: {
-        id: '3',
-        name: 'Lê Văn Cương'
-      },
-      doctorComment: '',
-      backgroundColor: '#FF9800'
-    }
-  ];
-  
-  const appointments = initialAppointments.length > 0 ? initialAppointments : defaultAppointments;
+  // Load appointments and date notes on mount
+  useEffect(() => {
+    const loadedAppointments = initialAppointments.length > 0 
+      ? initialAppointments 
+      : appointmentService.getAllAppointments();
+    setAppointments(loadedAppointments);
+    
+    const loadedDateNotes = appointmentService.getAllDateNotes();
+    setDateNotes(loadedDateNotes);
+  }, [initialAppointments]);
 
   // Check if a time slot has a conflict with existing appointments
   const hasTimeConflict = (startTime: Date, endTime: Date, excludeAppointmentId?: string): boolean => {
-    return appointments.some(appointment => {
-      // Skip checking against the appointment we're currently editing
-      if (excludeAppointmentId && appointment.id === excludeAppointmentId) {
-        return false;
-      }
-      
-      const aptStart = new Date(appointment.start);
-      const aptEnd = appointment.end ? new Date(appointment.end) : new Date(aptStart.getTime() + 45 * 60000); // Default to 45 minutes if no end time
-      
-      // Check for overlap: 
-      // If start time is before existing appointment end AND end time is after existing appointment start
-      return (startTime < aptEnd && endTime > aptStart);
-    });
+    return appointmentService.hasTimeConflict(startTime, endTime, excludeAppointmentId);
   };
 
   const handleEventClick = (clickInfo: EventClickArg) => {
@@ -148,23 +87,62 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
     }
   };
 
-  const handleEventChange = (changeInfo: EventChangeArg) => {
-    if (onAppointmentChange) {
-      const updatedAppointment = appointments.find(apt => apt.id === changeInfo.event.id);
-      if (updatedAppointment) {
-        const newStart = changeInfo.event.start || new Date();
-        const newEnd = changeInfo.event.end || new Date(newStart.getTime() + 45 * 60000);
+  const handleEventChange = async (changeInfo: EventChangeArg) => {
+    const appointmentToUpdate = appointments.find(apt => apt.id === changeInfo.event.id);
+    if (appointmentToUpdate) {
+      const newStart = changeInfo.event.start || new Date();
+      const newEnd = changeInfo.event.end || new Date(newStart.getTime() + 45 * 60000);
+      
+      // Check for conflicts when moving an appointment
+      if (!hasTimeConflict(newStart, newEnd, appointmentToUpdate.id)) {
+        const updatedAppointment = {
+          ...appointmentToUpdate,
+          start: newStart.toISOString(),
+          end: newEnd.toISOString()
+        };
         
-        // Check for conflicts when moving an appointment
-        if (!hasTimeConflict(newStart, newEnd, updatedAppointment.id)) {
-          updatedAppointment.start = newStart.toISOString();
-          updatedAppointment.end = newEnd.toISOString();
-          onAppointmentChange(updatedAppointment);
-        } else {
-          alert('Không thể di chuyển lịch hẹn do trùng với lịch hẹn khác.');
-          // Revert the change
+        try {
+          // Update in the service
+          await appointmentService.updateAppointment(updatedAppointment);
+          
+          // Update local state
+          setAppointments(prev => 
+            prev.map(apt => apt.id === updatedAppointment.id ? updatedAppointment : apt)
+          );
+          
+          // Notify parent component if provided
+          if (onAppointmentChange) {
+            onAppointmentChange(updatedAppointment);
+          }
+          
+          // Show success notification
+          setNotification({
+            show: true,
+            message: "Đã cập nhật lịch hẹn thành công!"
+          });
+          
+          // Auto-hide notification after 3 seconds
+          setTimeout(() => {
+            setNotification({show: false, message: ""});
+          }, 3000);
+        } catch (error) {
+          console.error("Error updating appointment:", error);
           changeInfo.revert();
+          
+          // Show error notification
+          setNotification({
+            show: true,
+            message: "Không thể cập nhật lịch hẹn. Vui lòng thử lại."
+          });
+          
+          setTimeout(() => {
+            setNotification({show: false, message: ""});
+          }, 3000);
         }
+      } else {
+        alert('Không thể di chuyển lịch hẹn do trùng với lịch hẹn khác.');
+        // Revert the change
+        changeInfo.revert();
       }
     }
   };
@@ -201,68 +179,108 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
     }
   };
 
-  const handleSaveComment = () => {
-    if (selectedAppointment && onAppointmentChange) {
+  const handleSaveComment = async () => {
+    if (selectedAppointment) {
       const updatedAppointment = {
         ...selectedAppointment,
         doctorComment: comment
       };
-      onAppointmentChange(updatedAppointment);
-      setShowCommentModal(false);
-      setSelectedAppointment(null);
       
-      // Hiển thị thông báo sau khi lưu
-      setNotification({
-        show: true,
-        message: "Đã lưu ghi chú cho cuộc hẹn thành công!"
-      });
-      
-      // Tự động ẩn thông báo sau 3 giây
-      setTimeout(() => {
-        setNotification({show: false, message: ""});
-      }, 3000);
+      try {
+        // Update in the service
+        await appointmentService.updateAppointment(updatedAppointment);
+        
+        // Update local state
+        setAppointments(prev => 
+          prev.map(apt => apt.id === updatedAppointment.id ? updatedAppointment : apt)
+        );
+        
+        // Close modal and clear selection
+        setShowCommentModal(false);
+        setSelectedAppointment(null);
+        
+        // Notify parent component if provided
+        if (onAppointmentChange) {
+          onAppointmentChange(updatedAppointment);
+        }
+        
+        // Show success notification
+        setNotification({
+          show: true,
+          message: "Đã lưu ghi chú cho cuộc hẹn thành công!"
+        });
+        
+        // Auto-hide notification after 3 seconds
+        setTimeout(() => {
+          setNotification({show: false, message: ""});
+        }, 3000);
+      } catch (error) {
+        console.error("Error saving appointment comment:", error);
+        
+        // Show error notification
+        setNotification({
+          show: true,
+          message: "Không thể lưu ghi chú. Vui lòng thử lại."
+        });
+        
+        setTimeout(() => {
+          setNotification({show: false, message: ""});
+        }, 3000);
+      }
     }
   };
   
-  const handleSaveDateNote = () => {
+  const handleSaveDateNote = async () => {
     if (selectedDate) {
       const dateString = selectedDate.toISOString().split('T')[0];
+      const newDateNote: DateNote = {
+        date: dateString,
+        note: dateNote
+      };
       
-      // Check if there's already a note for this date
-      const existingNoteIndex = dateNotes.findIndex(note => note.date === dateString);
-      
-      if (existingNoteIndex >= 0) {
-        // Update existing note
-        const updatedNotes = [...dateNotes];
-        updatedNotes[existingNoteIndex] = {
-          ...updatedNotes[existingNoteIndex],
-          note: dateNote
-        };
-        setDateNotes(updatedNotes);
-      } else {
-        // Add new note
-        setDateNotes([
-          ...dateNotes,
-          {
-            date: dateString,
-            note: dateNote
-          }
-        ]);
+      try {
+        // Save in the service
+        await appointmentService.saveDateNote(newDateNote);
+        
+        // Update local state
+        const existingNoteIndex = dateNotes.findIndex(note => note.date === dateString);
+        if (existingNoteIndex >= 0) {
+          setDateNotes(prev => {
+            const updated = [...prev];
+            updated[existingNoteIndex] = newDateNote;
+            return updated;
+          });
+        } else {
+          setDateNotes(prev => [...prev, newDateNote]);
+        }
+        
+        // Close modal and clear selection
+        setShowDateNoteModal(false);
+        setSelectedDate(null);
+        
+        // Show success notification
+        setNotification({
+          show: true,
+          message: "Đã lưu ghi chú cho ngày thành công!"
+        });
+        
+        // Auto-hide notification after 3 seconds
+        setTimeout(() => {
+          setNotification({show: false, message: ""});
+        }, 3000);
+      } catch (error) {
+        console.error("Error saving date note:", error);
+        
+        // Show error notification
+        setNotification({
+          show: true,
+          message: "Không thể lưu ghi chú. Vui lòng thử lại."
+        });
+        
+        setTimeout(() => {
+          setNotification({show: false, message: ""});
+        }, 3000);
       }
-      
-      setShowDateNoteModal(false);
-      setSelectedDate(null);
-      
-      // Hiển thị thông báo sau khi lưu
-      setNotification({
-        show: true,
-        message: "Đã lưu ghi chú cho ngày thành công!"
-      });
-      
-      // Tự động ẩn thông báo sau 3 giây
-      setTimeout(() => {
-        setNotification({show: false, message: ""});
-      }, 3000);
     }
   };
 
@@ -276,7 +294,7 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
     }));
   };
 
-  // Thêm CSS để tạo hiệu ứng hiển thị chỉ báo ghi chú trên lịch
+  // CSS for date note indicators
   useEffect(() => {
     const style = document.createElement('style');
     style.innerHTML = `
@@ -374,7 +392,7 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
         </div>
       </div>
 
-      {/* Thêm phần thông báo */}
+      {/* Notification */}
       {notification.show && (
         <div className="fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded shadow-md z-50 animate-fade-in-out">
           <div className="flex items-center">
@@ -466,16 +484,16 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
             const note = dateNotes.find(n => n.date === dateString);
             
             if (note) {
-              // Thêm class để đánh dấu ngày có ghi chú
+              // Add class to mark days with notes
               info.el.classList.add('date-has-note');
               
-              // Thêm badge "Ghi chú" vào ô ngày
+              // Add note indicator to the day cell
               const noteIndicator = document.createElement('div');
               noteIndicator.classList.add('date-note-indicator');
               noteIndicator.title = note.note;
               info.el.appendChild(noteIndicator);
               
-              // Thêm tooltip khi hover
+              // Add tooltip on hover
               info.el.addEventListener('mouseenter', (e) => {
                 const tooltip = document.createElement('div');
                 tooltip.style.position = 'absolute';
