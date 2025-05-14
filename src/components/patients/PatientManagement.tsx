@@ -413,20 +413,6 @@ const PatientManagement: React.FC = () => {
                                 placeholder="Nhập tình trạng bệnh"
                               />
                             </div>
-                            <div>
-                              <label
-                                htmlFor="next_appointment"
-                                className="block text-sm font-medium text-gray-700 mb-1"
-                              >
-                                Lịch hẹn tiếp theo
-                              </label>
-                              <input
-                                id="next_appointment"
-                                name="next_appointment"
-                                type="date"
-                                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
-                              />
-                            </div>
                           </div>
 
                           {/* MRI Images Upload */}
@@ -489,7 +475,7 @@ const PatientManagement: React.FC = () => {
 
             <div className="flex flex-col lg:flex-row gap-6">
               {/* Patients list */}
-              <div className="w-full lg:w-2/3 bg-white rounded-lg shadow-lg overflow-hidden">
+              <div className="p-5 w-full lg:w-2/3 bg-white rounded-lg shadow-lg overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="min-w-full">
                     <thead>

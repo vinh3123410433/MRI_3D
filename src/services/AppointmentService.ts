@@ -4,8 +4,8 @@ import dbManager from './DatabaseManager';
 export interface Appointment {
   id: string;
   title: string;
-  start: string;
-  end?: string;
+  start: string; // ISO date string
+  end?: string; // ISO date string
   patient: {
     id: string;
     name: string;
@@ -113,6 +113,25 @@ class AppointmentService {
   async getAppointmentById(id: string): Promise<Appointment | undefined> {
     await this.initialize();
     return this.appointments.find(appointment => appointment.id === id);
+  }
+  
+  // Get appointments for a specific patient
+  async getAppointmentsByPatientId(patientId: string): Promise<Appointment[]> {
+    await this.initialize();
+    return this.appointments.filter(appointment => appointment.patient.id === patientId);
+  }
+  
+  // Get appointments for a date range
+  async getAppointmentsForDateRange(start: Date, end: Date): Promise<Appointment[]> {
+    await this.initialize();
+    
+    const startStr = start.toISOString().split('T')[0];
+    const endStr = end.toISOString().split('T')[0];
+    
+    return this.appointments.filter(appointment => {
+      const appointmentDate = appointment.start.split('T')[0];
+      return appointmentDate >= startStr && appointmentDate <= endStr;
+    });
   }
   
   // Add a new appointment
