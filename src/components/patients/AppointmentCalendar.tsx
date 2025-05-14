@@ -23,15 +23,18 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
   onAppointmentChange,
   onNavigateHome,
 }) => {
+  // State management
   const [viewMode, setViewMode] = useState<'dayGridMonth' | 'timeGridWeek' | 'listWeek'>('dayGridMonth');
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const calendarRef = useRef<FullCalendar>(null);
+  
+  // Appointment related state
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [comment, setComment] = useState("");
   
-  // State for appointments and date notes
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  // Date note related state
   const [dateNotes, setDateNotes] = useState<DateNote[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDateNoteModal, setShowDateNoteModal] = useState(false);
@@ -42,32 +45,43 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
     show: false,
     message: ""
   });
-    // Load appointments and date notes on mount
+
+  // Show notification helper
+  const showNotification = (message: string) => {
+    setNotification({
+      show: true,
+      message
+    });
+    
+    // Auto-hide notification after 3 seconds
+    setTimeout(() => {
+      setNotification({show: false, message: ""});
+    }, 3000);
+  };
+  
+  // Load appointments and date notes on mount
   useEffect(() => {
-    const fetchData = async () => {
-      try {
+    const fetchData____ = async () => {
         // If we have initialAppointments, use those, otherwise load from service
         const loadedAppointments = initialAppointments.length > 0 
           ? initialAppointments 
           : await appointmentService.getAllAppointments();
-        setAppointments(loadedAppointments);
+        setAppointments([...loadedAppointments]);
         
         // Load date notes
         const loadedDateNotes = await appointmentService.getAllDateNotes();
-        setDateNotes(loadedDateNotes);
-      } catch (error) {
-        console.error('Failed to load calendar data:', error);
-      }
+        console.log("Loaded date notes:", loadedDateNotes);
+        setDateNotes([...loadedDateNotes]);
     };
-
-    fetchData();
-  }, [initialAppointments]);
+    fetchData____();
+  }, []);
 
   // Check if a time slot has a conflict with existing appointments
   const hasTimeConflict = (startTime: Date, endTime: Date, excludeAppointmentId?: string): boolean => {
     return appointmentService.hasTimeConflict(startTime, endTime, excludeAppointmentId);
   };
 
+  // Event handlers for calendar
   const handleEventClick = (clickInfo: EventClickArg) => {
     const appointment = appointments.find(apt => apt.id === clickInfo.event.id);
     if (appointment) {
@@ -124,29 +138,11 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
             onAppointmentChange(updatedAppointment);
           }
           
-          // Show success notification
-          setNotification({
-            show: true,
-            message: "Đã cập nhật lịch hẹn thành công!"
-          });
-          
-          // Auto-hide notification after 3 seconds
-          setTimeout(() => {
-            setNotification({show: false, message: ""});
-          }, 3000);
+          showNotification("Đã cập nhật lịch hẹn thành công!");
         } catch (error) {
           console.error("Error updating appointment:", error);
           changeInfo.revert();
-          
-          // Show error notification
-          setNotification({
-            show: true,
-            message: "Không thể cập nhật lịch hẹn. Vui lòng thử lại."
-          });
-          
-          setTimeout(() => {
-            setNotification({show: false, message: ""});
-          }, 3000);
+          showNotification("Không thể cập nhật lịch hẹn. Vui lòng thử lại.");
         }
       } else {
         alert('Không thể di chuyển lịch hẹn do trùng với lịch hẹn khác.');
@@ -156,6 +152,7 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
     }
   };
 
+  // Navigation handlers
   const handleToday = () => {
     setCurrentDate(new Date());
     if (calendarRef.current) {
@@ -188,6 +185,7 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
     }
   };
 
+  // Comment modal handlers
   const handleSaveComment = async () => {
     if (selectedAppointment) {
       const updatedAppointment = {
@@ -213,32 +211,15 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
           onAppointmentChange(updatedAppointment);
         }
         
-        // Show success notification
-        setNotification({
-          show: true,
-          message: "Đã lưu ghi chú cho cuộc hẹn thành công!"
-        });
-        
-        // Auto-hide notification after 3 seconds
-        setTimeout(() => {
-          setNotification({show: false, message: ""});
-        }, 3000);
+        showNotification("Đã lưu ghi chú cho cuộc hẹn thành công!");
       } catch (error) {
         console.error("Error saving appointment comment:", error);
-        
-        // Show error notification
-        setNotification({
-          show: true,
-          message: "Không thể lưu ghi chú. Vui lòng thử lại."
-        });
-        
-        setTimeout(() => {
-          setNotification({show: false, message: ""});
-        }, 3000);
+        showNotification("Không thể lưu ghi chú. Vui lòng thử lại.");
       }
     }
   };
   
+  // Date note modal handlers
   const handleSaveDateNote = async () => {
     if (selectedDate) {
       const dateString = selectedDate.toISOString().split('T')[0];
@@ -247,7 +228,8 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
         note: dateNote
       };
       
-      try {        // Save in the service 
+      try {        
+        // Save in the service 
         await appointmentService.saveDateNote(dateString, dateNote);
         
         // Update local state
@@ -266,28 +248,10 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
         setShowDateNoteModal(false);
         setSelectedDate(null);
         
-        // Show success notification
-        setNotification({
-          show: true,
-          message: "Đã lưu ghi chú cho ngày thành công!"
-        });
-        
-        // Auto-hide notification after 3 seconds
-        setTimeout(() => {
-          setNotification({show: false, message: ""});
-        }, 3000);
+        showNotification("Đã lưu ghi chú cho ngày thành công!");
       } catch (error) {
         console.error("Error saving date note:", error);
-        
-        // Show error notification
-        setNotification({
-          show: true,
-          message: "Không thể lưu ghi chú. Vui lòng thử lại."
-        });
-        
-        setTimeout(() => {
-          setNotification({show: false, message: ""});
-        }, 3000);
+        showNotification("Không thể lưu ghi chú. Vui lòng thử lại.");
       }
     }
   };
@@ -455,7 +419,7 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
                 tooltip.remove();
               };
 
-              const showTooltip = (e: MouseEvent) => {
+              const showTooltip = () => {
                 const rect = info.el.getBoundingClientRect();
                 tooltip.style.position = 'absolute';
                 tooltip.style.top = `${rect.bottom + window.scrollY + 5}px`;
@@ -468,7 +432,7 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
                 tooltip.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
               };
 
-              info.el.addEventListener('mouseenter', showTooltip as EventListener);
+              info.el.addEventListener('mouseenter', showTooltip);
               info.el.addEventListener('mouseleave', hideTooltip);
             }
           }}

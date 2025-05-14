@@ -2,8 +2,8 @@ import { OrbitControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import * as NiftiReader from "nifti-reader-js";
 import React, { useEffect, useRef, useState } from "react";
-import VolumeMesh from "./VolumeMesh";
 import mriService from "../../services/MriService";
+import VolumeMesh from "./VolumeMesh";
 
 interface MriData {
   data: Float32Array;
@@ -565,27 +565,6 @@ const MriViewer: React.FC = () => {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            <label
-              htmlFor="threshold"
-              className="text-sm font-medium text-gray-700"
-            >
-              Ngưỡng:
-            </label>
-            <input
-              type="range"
-              id="threshold"
-              min="0"
-              max="1"
-              step="0.01"
-              value={threshold}
-              onChange={(e) => setThreshold(parseFloat(e.target.value))}
-              className="w-32"
-            />
-            <span className="text-sm text-gray-600">
-              {threshold.toFixed(2)}
-            </span>
-          </div>
         </div>
 
         <div className="flex items-center gap-2">
