@@ -3,13 +3,9 @@ import mriService from "../../services/MriService";
 import patientService, { Patient } from "../../services/PatientService";
 import AppointmentCalendar from "./AppointmentCalendar";
 import PatientMriViewer from "./PatientMriViewer";
-import PatientIntakeForm, {
-    PatientIntakeData,
-} from "./forms/PatientIntakeForm";
 
 type View =
   | "patients"
-  | "intake-form"
   | "calendar"
   | "mri-viewer"
   | "patient-history";
@@ -38,34 +34,6 @@ const PatientManagement: React.FC = () => {
       patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       patient.phone.includes(searchQuery)
   );
-
-  const handleIntakeFormSubmit = async (formData: PatientIntakeData) => {
-    // Create a new patient object
-    const newPatient = await patientService.addPatient({
-      name: formData.patientName,
-      phone: "", // Would need to be added to the form if required
-      condition: formData.symptoms,
-      nextAppointment: new Date().toLocaleDateString("vi-VN"),
-      birthDate: "", // Would need to be added to the form if required
-      gender: "", // Would need to be added to the form if required
-      medical_history: formData.medicalHistory,
-    });
-
-    // Update the state with the new patient list
-    setPatients(patientService.getAllPatients());
-
-    // Switch to the calendar view if MRI is required
-    if (formData.requiresMri) {
-      setCurrentView("calendar");
-    } else {
-      setCurrentView("patients");
-      setSelectedPatient(newPatient);
-    }
-  };
-
-  const handleIntakeFormCancel = () => {
-    setCurrentView("patients");
-  };
 
   // Check if the selected patient has any MRI scans  const [mriCountsByPatient, setMriCountsByPatient] = useState<Record<string, number>>({});
 
@@ -109,6 +77,7 @@ const PatientManagement: React.FC = () => {
 
     // Get form data from the event
     const formData = new FormData(event.currentTarget);
+    const requiresMri = formData.get("requires_mri") === "on";
 
     // Create patient data object
     const patientData = {
@@ -119,30 +88,12 @@ const PatientManagement: React.FC = () => {
       condition: (formData.get("condition") as string) || "",
       nextAppointment: (formData.get("next_appointment") as string) || "",
       medical_history: (formData.get("history") as string) || "",
+      severity: (formData.get("severity") as string) || "Trung bình",
     };
 
     try {
       // Add the patient using our service
       const newPatient = await patientService.addPatient(patientData);
-
-      // Process MRI file if one was selected
-    //   const fileInput = formData.get("mri_images") as File;
-    //   if (fileInput && fileInput.size > 0) {
-    //     // Store the MRI file
-    //     // await patientService.saveMriFile(newPatient.id, fileInput);
-
-    //     // Process the file for the MRI viewer
-    //     // const buffer = await patientService.getMriFile(fileInput);
-
-    //     // Use the MRI service to save the processed data
-    //     try {
-    //       // This would need to be implemented to use the buffer
-    //       // For now, we'll just show that the integration point exists
-    //       console.log("MRI file processed and ready for viewer");
-    //     } catch (error) {
-    //       console.error("Error processing MRI file for viewer:", error);
-    //     }
-    //   }
 
       // Update the patients list and close the dialog
       setPatients(patientService.getAllPatients());
@@ -150,6 +101,11 @@ const PatientManagement: React.FC = () => {
 
       // Select the new patient
       setSelectedPatient(newPatient);
+      
+      // Navigate to calendar view if MRI is required
+      if (requiresMri) {
+        setCurrentView("calendar");
+      }
     } catch (error) {
       console.error("Error adding patient:", error);
       alert("Có lỗi xảy ra khi thêm bệnh nhân. Vui lòng thử lại.");
@@ -158,13 +114,6 @@ const PatientManagement: React.FC = () => {
 
   const renderView = () => {
     switch (currentView) {
-      case "intake-form":
-        return (
-          <PatientIntakeForm
-            onSubmit={handleIntakeFormSubmit}
-            onCancel={handleIntakeFormCancel}
-          />
-        );
       case "calendar":
         return (
           <AppointmentCalendar
@@ -231,12 +180,146 @@ const PatientManagement: React.FC = () => {
               </button>
             </div>
 
-            <div className="flex justify-center mt-8">
+            <div className="mb-6">
+              <div className="bg-blue-50 p-4 rounded-lg mb-6">
+                <h2 className="text-lg font-semibold text-blue-800 mb-2">Thông tin bệnh nhân</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500">Họ và tên</p>
+                    <p className="font-medium">{selectedPatient.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Ngày sinh</p>
+                    <p className="font-medium">{selectedPatient.birthDate || "Không có thông tin"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Giới tính</p>
+                    <p className="font-medium">{selectedPatient.gender || "Không có thông tin"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Số điện thoại</p>
+                    <p className="font-medium">{selectedPatient.phone || "Không có thông tin"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Tình trạng hiện tại</p>
+                    <p className="font-medium">{selectedPatient.condition || "Không có thông tin"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Lịch hẹn tiếp theo</p>
+                    <p className="font-medium">{selectedPatient.nextAppointment || "Không có lịch hẹn"}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <h2 className="text-lg font-semibold text-blue-800 mb-3">Tiền sử bệnh</h2>
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <p className="text-gray-700">{selectedPatient.medical_history || "Không có tiền sử bệnh"}</p>
+                </div>
+              </div>
+
+              <h2 className="text-lg font-semibold text-blue-800 mb-4">Lịch sử khám bệnh chi tiết</h2>
+              
+              <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg mb-4">
+                <table className="min-w-full divide-y divide-gray-300">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900">Ngày khám</th>
+                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Chẩn đoán</th>
+                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Bác sĩ</th>
+                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Triệu chứng</th>
+                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Thuốc kê đơn</th>
+                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Ghi chú</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {selectedPatient.id === "1" ? (
+                      <>
+                        <tr>
+                          <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900">15/03/2025</td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">Đau đầu căng thẳng</td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">Bs. Nguyễn Văn X</td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">Đau đầu, chóng mặt, mất ngủ</td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">Paracetamol 500mg: 2 viên/ngày x 5 ngày</td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">Nghỉ ngơi, giảm căng thẳng</td>
+                        </tr>
+                        <tr>
+                          <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900">25/04/2025</td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">Tái khám</td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">Bs. Nguyễn Văn X</td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">Cải thiện nhẹ, vẫn còn đau đầu</td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">Ibuprofen 400mg: 1 viên/ngày x 7 ngày</td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">Theo dõi tiếp, cần chụp MRI nếu tình trạng kéo dài</td>
+                        </tr>
+                        <tr>
+                          <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900">10/05/2025</td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">Theo dõi định kỳ</td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">Bs. Trần Thị Y</td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">Đau đầu giảm, cải thiện tình trạng giấc ngủ</td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">Vitamin B Complex: 1 viên/ngày x 30 ngày</td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">Tình trạng ổn định, tiếp tục theo dõi</td>
+                        </tr>
+                      </>
+                    ) : (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-4 text-sm text-center text-gray-500">Không có dữ liệu lịch sử khám bệnh</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-6">
+                <h2 className="text-lg font-semibold text-blue-800 mb-4">Lịch sử chỉ định chụp MRI</h2>
+                {selectedPatient.id === "1" ? (
+                  <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                    <table className="min-w-full divide-y divide-gray-300">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900">Ngày chỉ định</th>
+                          <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Loại chụp</th>
+                          <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Lý do</th>
+                          <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Bác sĩ chỉ định</th>
+                          <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Trạng thái</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 bg-white">
+                        <tr>
+                          <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900">25/04/2025</td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">MRI sọ não</td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">Đau đầu kéo dài không rõ nguyên nhân</td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">Bs. Nguyễn Văn X</td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm">
+                            <span className="inline-flex rounded-full bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800">Hoàn thành</span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center">Không có dữ liệu chỉ định chụp MRI</p>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-between">
               <button
                 onClick={() => setCurrentView("patients")}
-                className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                className="px-6 py-3 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
               >
                 Quay lại
+              </button>
+              
+              <button
+                onClick={() => setCurrentView("mri-viewer")}
+                className={`px-6 py-3 rounded-md ${
+                  hasMriScans(selectedPatient.id) 
+                    ? "bg-blue-600 text-white hover:bg-blue-700" 
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                }`}
+                disabled={!hasMriScans(selectedPatient.id)}
+              >
+                {hasMriScans(selectedPatient.id) ? "Xem MRI 3D" : "Không có MRI"}
               </button>
             </div>
           </div>
@@ -263,22 +346,16 @@ const PatientManagement: React.FC = () => {
               </h1>
               <div className="flex gap-2">
                 <button
-                  onClick={() => setCurrentView("intake-form")}
+                  onClick={() => setAddShow(true)}
                   className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
                 >
-                  Tiếp nhận bệnh nhân mới
+                  Thêm bệnh nhân mới
                 </button>
                 <button
                   onClick={() => setCurrentView("calendar")}
                   className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
                 >
                   Lịch khám
-                </button>
-                <button
-                  onClick={() => setAddShow(true)}
-                  className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors"
-                >
-                  Thêm bệnh nhân
                 </button>
               </div>
             </div>
@@ -321,8 +398,11 @@ const PatientManagement: React.FC = () => {
                       <div className="w-full">
                         <div>
                           <h2 className="text-center text-2xl font-bold text-gray-900 mb-4">
-                            Thêm bệnh nhân
+                            Thêm bệnh nhân mới
                           </h2>
+                          <p className="text-center text-gray-600 mb-4">
+                            Nhập thông tin bệnh nhân mới và chọn "Yêu cầu chụp MRI" nếu cần đặt lịch chụp
+                          </p>
                         </div>
                         <form className="space-y-4" onSubmit={handleAddPatient}>
                           {/* Name and Phone */}
@@ -413,6 +493,20 @@ const PatientManagement: React.FC = () => {
                                 placeholder="Nhập tình trạng bệnh"
                               />
                             </div>
+                            <div>
+                              <label
+                                htmlFor="next_appointment"
+                                className="block text-sm font-medium text-gray-700 mb-1"
+                              >
+                                Lịch hẹn tiếp theo
+                              </label>
+                              <input
+                                id="next_appointment"
+                                name="next_appointment"
+                                type="date"
+                                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+                              />
+                            </div>
                           </div>
 
                           {/* MRI Images Upload */}
@@ -447,6 +541,38 @@ const PatientManagement: React.FC = () => {
                               className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
                               placeholder="Nhập tiền sử bệnh"
                             ></textarea>
+                          </div>
+                          
+                          {/* Severity */}
+                          <div>
+                            <label
+                              htmlFor="severity"
+                              className="block text-sm font-medium text-gray-700 mb-1"
+                            >
+                              Mức độ nghiêm trọng
+                            </label>
+                            <select
+                              id="severity"
+                              name="severity"
+                              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+                            >
+                              <option value="Nhẹ">Nhẹ</option>
+                              <option value="Trung bình" selected>Trung bình</option>
+                              <option value="Nghiêm trọng">Nghiêm trọng</option>
+                            </select>
+                          </div>
+                          
+                          {/* Requires MRI Checkbox */}
+                          <div className="flex items-center">
+                            <input
+                              id="requires_mri"
+                              name="requires_mri"
+                              type="checkbox"
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                            <label htmlFor="requires_mri" className="ml-2 block text-sm text-gray-900">
+                              Yêu cầu chụp MRI
+                            </label>
                           </div>
 
                           {/* Submit Button */}
@@ -576,6 +702,7 @@ const PatientManagement: React.FC = () => {
                     </div>
 
                     {/* Sample visit history - in a real app, this would be fetched from a database */}
+                    {/* Lịch sử khám bệnh */}
                     <div>
                       <h2 className="text-xl font-semibold text-gray-800 mb-3">
                         Lịch sử khám bệnh
@@ -656,6 +783,14 @@ const PatientManagement: React.FC = () => {
                           </tbody>
                         </table>
                       </div>
+                      <div className="mt-2 text-right">
+                        <button
+                          className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                          onClick={() => setCurrentView("patient-history")}
+                        >
+                          Xem lịch sử đầy đủ
+                        </button>
+                      </div>
                     </div>
 
                     <div className="mt-6 flex gap-3">
@@ -663,7 +798,7 @@ const PatientManagement: React.FC = () => {
                         className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors w-full"
                         onClick={() => setCurrentView("patient-history")}
                       >
-                        Xem chi tiết
+                        Xem lịch sử khám bệnh
                       </button>
                     </div>
 

@@ -10,6 +10,7 @@ export interface Patient {
   birthDate: string;
   gender: string;
   medical_history: string;
+  severity?: string;
   email?: string;
   address?: string;
 }
